@@ -1,3 +1,5 @@
+// RegisterScreen.tsx - COMPLETE FIXED VERSION
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -25,17 +27,18 @@ const { height } = Dimensions.get('window');
 
 // --- KONSTANTA WARNA DARI LOGO (SAMA SEPERTI LOGIN) ---
 const COLORS = {
-  primary: '#1C3A5A',      // Biru Tua (Dark Navy Blue)
-  secondary: '#00A79D',    // Hijau Tosca/Sian (Teal/Cyan)
-  accent: '#F58220',       // Oranye Terang (Bright Orange)
-  background: '#F5F5F5',   // Abu-abu Sangat Terang
-  cardBg: '#FFFFFF',       // Putih untuk card
-  textDark: '#444444',     // Abu-abu Gelap
-  textLight: '#7f8c8d',    // Abu-abu Terang
-  disabled: '#95a5a6',     // Abu-abu untuk disabled
+  primary: '#1C3A5A',
+  secondary: '#00A79D',
+  accent: '#F58220',
+  background: '#F5F5F5',
+  cardBg: '#FFFFFF',
+  textDark: '#444444',
+  textLight: '#7f8c8d',
+  disabled: '#95a5a6',
 };
 
 const RegisterScreen = () => {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -81,38 +84,35 @@ const RegisterScreen = () => {
   }, [fadeAnim, scaleAnim]);
 
   // --- Fungsi Register ---
-  const handleRegister = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Email dan Password harus diisi.', [{ text: 'OK' }]);
-      return;
-    }
+const handleRegister = async () => {
+  if (!email || !password || !confirmPassword || !fullName.trim()) {
+    Alert.alert('Error', 'Semua field harus diisi.');
+    return;
+  }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password minimal 6 karakter.', [{ text: 'OK' }]);
-      return;
-    }
+  if (password.length < 6) {
+    Alert.alert('Error', 'Password minimal 6 karakter.');
+    return;
+  }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Password dan Konfirmasi Password tidak sama.', [{ text: 'OK' }]);
-      return;
-    }
+  if (password !== confirmPassword) {
+    Alert.alert('Error', 'Password dan Konfirmasi Password tidak sama.');
+    return;
+  }
 
-    setIsLoading(true);
+  setIsLoading(true);
+
 
     try {
-      await registerUser(email, password);
+    // Kirim fullName ke registerUser
+    await registerUser(email.trim(), password, fullName.trim());
 
-      Alert.alert(
-        'Pendaftaran Sukses',
-        'Akun Kasir berhasil dibuat! Silakan login dengan akun baru.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.replace('Login'),
-          },
-        ]
-      );
-    } catch (error: any) {
+    Alert.alert(
+      'Pendaftaran Sukses',
+      'Akun kasir berhasil dibuat!',
+      [{ text: 'OK', onPress: () => navigation.replace('Login') }]
+    );
+  } catch (error: any) {
       let errorMessage = 'Pendaftaran gagal.';
 
       if (error.code) {
@@ -138,15 +138,26 @@ const RegisterScreen = () => {
     }
   };
   
-  // --- Komponen Tombol Kustom dengan Animasi Sentuhan ---
+  // --- Komponen Tombol Kustom dengan Animasi Sentuhan - FIXED ---
   const AnimatedRegisterButton = ({ title, onPress, disabled }: any) => {
     const pressAnim = useRef(new Animated.Value(1)).current;
 
     const onPressIn = () => {
-      Animated.timing(pressAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }).start();
+      Animated.spring(pressAnim, { 
+        toValue: 0.96, 
+        useNativeDriver: true,
+        speed: 50,
+        bounciness: 0,
+      }).start();
     };
+    
     const onPressOut = () => {
-      Animated.timing(pressAnim, { toValue: 1, duration: 100, useNativeDriver: true }).start();
+      Animated.spring(pressAnim, { 
+        toValue: 1, 
+        useNativeDriver: true,
+        speed: 50,
+        bounciness: 0,
+      }).start();
     };
 
     return (
@@ -155,10 +166,17 @@ const RegisterScreen = () => {
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         disabled={disabled}
-        activeOpacity={1}
+        activeOpacity={0.9}
         style={[styles.registerButtonContainer, disabled && styles.registerButtonDisabled]}
       >
-        <Animated.View style={{ transform: [{ scale: pressAnim }] }}>
+        <Animated.View 
+          style={{ 
+            transform: [{ scale: pressAnim }],
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           {disabled ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
@@ -192,6 +210,8 @@ const RegisterScreen = () => {
         <Text style={styles.title}>Daftar Akun Baru</Text>
         <Text style={styles.subtitle}>Buat akun kasir untuk aplikasi POS</Text>
 
+        
+
         {/* Input Email */}
         <FloatingLabelInput
           label="Email Kasir"
@@ -200,6 +220,14 @@ const RegisterScreen = () => {
           keyboardType="email-address"
           autoCapitalize="none"
         />
+
+        {/* Input Nama Lengkap */}
+<FloatingLabelInput
+  label="Nama Lengkap Kasir"
+  value={fullName}
+  onChangeText={setFullName}
+  autoCapitalize="words"
+/>
 
         {/* Input Password */}
         <FloatingLabelInput
@@ -241,7 +269,7 @@ const RegisterScreen = () => {
         <Animated.Text 
           style={[styles.footerText, { opacity: fadeAnim }]}
         >
-          Aplikasi Point of Sale | © 2025
+          Swiftpay | © 2025
         </Animated.Text>
       )}
     </View>
@@ -254,13 +282,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background, // #F5F5F5
+    backgroundColor: COLORS.background,
     padding: 20,
   },
   card: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: COLORS.cardBg, // #FFFFFF
+    backgroundColor: COLORS.cardBg,
     borderRadius: 20,
     padding: 30,
     ...Platform.select({
@@ -283,27 +311,28 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    color: COLORS.primary, // #1C3A5A - Biru Tua
+    color: COLORS.primary,
     marginBottom: 5,
     textAlign: 'center',
     fontWeight: '700',
   },
   subtitle: {
     fontSize: 15,
-    color: COLORS.textDark, // #444444
+    color: COLORS.textDark,
     marginBottom: 25,
     textAlign: 'center',
     fontWeight: '500',
   },
-  // --- Styling Tombol Register ---
+  // --- Styling Tombol Register - FIXED ---
   registerButtonContainer: {
-    backgroundColor: COLORS.accent, // #F58220 - Oranye Terang (berbeda dari login untuk variasi)
+    backgroundColor: COLORS.accent,
     paddingVertical: 14,
     borderRadius: 10,
     marginTop: 10,
     alignItems: 'center',
     justifyContent: 'center',
     height: 50,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: COLORS.accent,
@@ -317,7 +346,7 @@ const styles = StyleSheet.create({
     }),
   },
   registerButtonDisabled: {
-    backgroundColor: COLORS.disabled, // #95a5a6
+    backgroundColor: COLORS.disabled,
   },
   registerButtonText: {
     color: '#FFFFFF',
@@ -330,11 +359,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginText: {
-    color: COLORS.textLight, // #7f8c8d
+    color: COLORS.textLight,
     fontSize: 15,
   },
   loginTextHighlight: {
-    color: COLORS.primary, // #1C3A5A - Biru Tua
+    color: COLORS.primary,
     fontWeight: '700',
   },
   footerText: {

@@ -206,7 +206,7 @@ const LoginScreen = () => {
         <Animated.Text 
             style={[styles.footerText, { opacity: fadeAnim }]}
         >
-            Aplikasi Point of Sale | © 2025
+            Swiftpay | © 2025
         </Animated.Text>
       )}
 
