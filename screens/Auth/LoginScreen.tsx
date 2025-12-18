@@ -11,8 +11,11 @@ import {
   Keyboard,
   Platform,
   Image,
+  ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 
+import { Mail, Lock } from 'lucide-react-native'; // Tambahkan icon agar selaras
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -23,16 +26,15 @@ type LoginNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'
 
 const { height } = Dimensions.get('window');
 
-// --- KONSTANTA WARNA DARI LOGO ---
 const COLORS = {
-  primary: '#1C3A5A',      // Biru Tua (Dark Navy Blue)
-  secondary: '#00A79D',    // Hijau Tosca/Sian (Teal/Cyan)
-  accent: '#F58220',       // Oranye Terang (Bright Orange)
-  background: '#F5F5F5',   // Abu-abu Sangat Terang
-  cardBg: '#FFFFFF',       // Putih untuk card
-  textDark: '#444444',     // Abu-abu Gelap
-  textLight: '#7f8c8d',    // Abu-abu Terang
-  disabled: '#95a5a6',     // Abu-abu untuk disabled
+  primary: '#1C3A5A',
+  secondary: '#00A79D',
+  accent: '#F58220',
+  background: '#F5F5F5',
+  cardBg: '#FFFFFF',
+  textDark: '#444444',
+  textLight: '#7f8c8d',
+  disabled: '#95a5a6',
 };
 
 const LoginScreen = () => {
@@ -43,153 +45,101 @@ const LoginScreen = () => {
 
   const navigation = useNavigation<LoginNavigationProp>();
 
-  // --- Hooks Animasi ---
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
-    // Animasi Pintu Masuk
     Animated.parallel([
-        Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-            toValue: 1,
-            friction: 7,
-            tension: 40,
-            useNativeDriver: true,
-        }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
     ]).start();
-    
-    // Listener untuk Keyboard (untuk menyesuaikan tampilan saat keyboard muncul)
-    const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true),
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false),
-    );
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const keyboardDidShowListener = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
 
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
-  }, [fadeAnim, scaleAnim]);
+  }, []);
 
-  // --- Fungsi Login ---
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Email dan Password harus diisi.', [{ text: 'OK' }]);
+      Alert.alert('Error', 'Email dan Password harus diisi.');
       return;
     }
 
     setIsLoading(true);
-
     try {
-      const { user, role } = await loginUser(email, password);
-      console.log(`Pengguna ${user.uid} login dengan role: ${role}`);
-
+      const { role } = await loginUser(email.trim(), password);
       if (role === 'admin') {
         navigation.replace('AdminDashboard');
       } else {
         navigation.replace('CashierDashboard');
       }
     } catch (error: any) {
-      Alert.alert(
-        'Login Gagal',
-        error.code === 'auth/invalid-credential'
-          ? 'Email atau Password salah. Silakan periksa kembali.'
-          : 'Terjadi kesalahan jaringan atau server. Silakan coba lagi.',
-      );
-      console.error('Login Error:', error);
+      Alert.alert('Login Gagal', 'Email atau Password salah.');
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // --- Komponen Tombol Kustom dengan Animasi Sentuhan (Press Animation) ---
-  const AnimatedLoginButton = ({ title, onPress, disabled }: any) => {
-    const pressAnim = useRef(new Animated.Value(1)).current;
-
-    const onPressIn = () => {
-      Animated.timing(pressAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }).start();
-    };
-    const onPressOut = () => {
-      Animated.timing(pressAnim, { toValue: 1, duration: 100, useNativeDriver: true }).start();
-    };
-
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        disabled={disabled}
-        activeOpacity={1}
-        style={[styles.loginButtonContainer, disabled && styles.loginButtonDisabled]}
-      >
-        <Animated.View style={{ transform: [{ scale: pressAnim }] }}>
-          {disabled ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.loginButtonText}>{title}</Text>
-          )}
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
-
 
   return (
-    <View style={styles.container}>
-      {/* Container utama untuk Login Card */}
-      <Animated.View style={[
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={styles.container}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[
           styles.card, 
-          { 
-              opacity: fadeAnim, 
-              // Geser card ke atas saat keyboard muncul
-              transform: [
-                { scale: scaleAnim },
-                { translateY: isKeyboardVisible ? (Platform.OS === 'ios' ? -height * 0.1 : -height * 0.05) : 0 },
-              ]
-          }
-      ]}>
-          {/* Logo Image */}
+          { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
+        ]}>
           <Image 
-            source={require('../../assets/login.png')}
+            source={require('../../assets/iconmain.png')} // Diselaraskan dengan aset Register
             style={styles.logo}
             resizeMode="contain"
           />
           
-          <Text style={styles.subtitle}>Masukkan Akun Anda</Text>
+          <Text style={styles.title}>Selamat Datang</Text>
+          <Text style={styles.subtitle}>Silakan masuk untuk melanjutkan transaksi kasir Anda.</Text>
 
-          {/* Input Email menggunakan FloatingLabelInput */}
           <FloatingLabelInput
-            label="Email Kasir/Admin"
+            label="Email"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            icon={<Mail size={20} color="#7f8c8d" />} // Ditambahkan icon
           />
 
-          {/* Input Password menggunakan FloatingLabelInput */}
           <FloatingLabelInput
             label="Password"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            isPassword
+            icon={<Lock size={20} color="#7f8c8d" />} // Ditambahkan icon
           />
 
-          {/* Tombol Login */}
-          <AnimatedLoginButton
-            title="Masuk"
+          <TouchableOpacity
             onPress={handleLogin}
             disabled={isLoading}
-          />
+            activeOpacity={0.8}
+            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Masuk Sekarang</Text>
+            )}
+          </TouchableOpacity>
 
-          {/* Link Pendaftaran */}
           <TouchableOpacity
             style={styles.registerLink}
             onPress={() => navigation.navigate('Register')}
@@ -199,72 +149,72 @@ const LoginScreen = () => {
               Belum punya akun? <Text style={styles.registerTextHighlight}>Daftar di sini</Text>
             </Text>
           </TouchableOpacity>
-      </Animated.View>
-      
-      {/* Teks Footer */}
-      {!isKeyboardVisible && (
-        <Animated.Text 
-            style={[styles.footerText, { opacity: fadeAnim }]}
-        >
-            Swiftpay | © 2025
-        </Animated.Text>
-      )}
-
-    </View>
+        </Animated.View>
+        
+        {!isKeyboardVisible && (
+          <Text style={styles.footerText}>Swiftstock by Efendi | © 2025</Text>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
-// --- STYLING DENGAN SKEMA WARNA LOGO ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background, // #F5F5F5 - Abu-abu Sangat Terang
-    padding: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
   card: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: COLORS.cardBg, // #FFFFFF
-    borderRadius: 20,
-    padding: 30,
-    // Bayangan elegan dengan warna primary
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 25,
+    padding: 25,
     ...Platform.select({
       ios: {
         shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 15,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
       },
-      android: {
-        elevation: 10,
-      },
+      android: { elevation: 8 },
     }),
   },
   logo: {
-    width: 140,
-    height: 140,
+    width: '100%',
+    height: 60, // Sesuaikan kembali jika login.png berbeda ukuran dengan iconmain.png
     alignSelf: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
+  },
+  title: {
+    fontSize: 26,
+    color: COLORS.primary,
+    marginBottom: 8,
+    textAlign: 'center',
+    fontFamily: 'MontserratBold',
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.textDark, // #444444 - Abu-abu Gelap
-    marginBottom: 30,
+    fontSize: 14,
+    color: COLORS.textLight,
+    marginBottom: 25,
     textAlign: 'center',
-    fontWeight: '500',
+    fontFamily: 'PoppinsRegular',
+    lineHeight: 20,
   },
-  // --- Styling Tombol Login dengan Gradient Effect ---
-  loginButtonContainer: {
-    backgroundColor: COLORS.secondary, // #00A79D - Hijau Tosca
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginTop: 10,
+  loginButton: {
+    backgroundColor: COLORS.secondary,
+    height: 55,
+    borderRadius: 12,
+    marginTop: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 50,
-    // Bayangan untuk depth
     ...Platform.select({
       ios: {
         shadowColor: COLORS.secondary,
@@ -272,39 +222,37 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
       },
-      android: {
-        elevation: 5,
-      },
+      android: { elevation: 5 },
     }),
   },
   loginButtonDisabled: {
-    backgroundColor: COLORS.disabled, // #95a5a6
+    backgroundColor: COLORS.disabled,
   },
   loginButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'PoppinsSemiBold',
   },
-  // --- Styling Link Pendaftaran ---
   registerLink: {
     marginTop: 25,
     alignItems: 'center',
   },
   registerText: {
-    color: COLORS.textLight, // #7f8c8d
+    color: COLORS.textLight,
     fontSize: 15,
+    fontFamily: 'PoppinsRegular',
   },
   registerTextHighlight: {
-    color: COLORS.primary, // #1C3A5A - Biru Tua
-    fontWeight: '700',
+    color: COLORS.primary,
+    fontFamily: 'PoppinsSemiBold',
   },
   footerText: {
-    marginTop: 40,
+    marginTop: 30,
     fontSize: 12,
-    color: COLORS.textLight, // #7f8c8d
-    position: 'absolute',
-    bottom: 20,
-  }
+    color: COLORS.textLight,
+    fontFamily: 'PoppinsRegular',
+    textAlign: 'center',
+  },
 });
 
 export default LoginScreen;

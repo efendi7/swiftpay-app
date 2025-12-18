@@ -1,4 +1,4 @@
-// components/FloatingLabelInput.tsx - FIXED VERSION
+// components/FloatingLabelInput.tsx - VERSI FIX ERROR ANIMATED LEFT
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -10,112 +10,117 @@ import {
   TextInputProps,
   Platform,
   Easing,
+  TouchableOpacity,
 } from 'react-native';
 
-// --- KONSTANTA DESAIN ---
-const FORM_BACKGROUND = '#FFFFFF';
-const BORDER_COLOR_NORMAL = '#bdc3c7';
-const BORDER_COLOR_FOCUSED = '#3498db';
-const LABEL_COLOR_NORMAL = '#7f8c8d';
-const LABEL_COLOR_FOCUSED = '#34495e';
-const LABEL_COLOR_ACTIVE = '#3498db';
+import { Eye, EyeOff } from 'lucide-react-native';
+
+const COLORS = {
+  primary: '#00A79D',
+  borderNormal: '#bdc3c7',
+  labelNormal: '#7f8c8d',
+  text: '#34495e',
+  background: '#FFFFFF',
+};
 
 interface FloatingLabelInputProps extends TextInputProps {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
-  isFocused?: boolean;
+  icon?: React.ReactNode;
+  isPassword?: boolean;
+  inputStyle?: object;
+  labelStyle?: object;
 }
 
 const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
   label,
   value,
   onChangeText,
-  isFocused: externalIsFocused,
+  icon,
+  isPassword,
+  inputStyle,
+  labelStyle,
   ...rest
 }) => {
-  const [internalIsFocused, setInternalIsFocused] = useState(false);
-  const isFocused = externalIsFocused ?? internalIsFocused;
-  
+  const [isFocused, setIsFocused] = useState(false);
+  const [secure, setSecure] = useState(!!isPassword);
+
   const floatAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {
-    const shouldFloat = isFocused || value.length > 0;
-    
     Animated.timing(floatAnim, {
-      toValue: shouldFloat ? 1 : 0,
+      toValue: isFocused || value ? 1 : 0,
       duration: 200,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: true, // Aman karena hanya pakai transform & opacity
     }).start();
-  }, [isFocused, value, floatAnim]);
-
-  // --- Interpolasi untuk Transform ---
-  const START_Y = 0;
-  const END_Y = -30;
+  }, [isFocused, value]);
 
   const translateY = floatAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [START_Y, END_Y],
+    outputRange: [0, -34],
   });
 
   const scale = floatAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 0.75],
+    outputRange: [1, 0.785], // ~11px dari base 14px
   });
 
-  const opacity = floatAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.6, 0.8, 1],
+  // Geser horizontal pakai translateX (supported native!)
+  const translateX = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [icon ? 38 : 0, icon ? -8 : 0], 
+    // Awal: geser ke kanan agar tidak numpuk icon
+    // Akhir: geser sedikit ke kiri agar rata semua field
   });
 
-  const labelColor = isFocused 
-    ? LABEL_COLOR_ACTIVE 
-    : (value ? LABEL_COLOR_FOCUSED : LABEL_COLOR_NORMAL);
-  
-  const borderColor = isFocused ? BORDER_COLOR_FOCUSED : BORDER_COLOR_NORMAL;
+  const labelColor = isFocused ? COLORS.primary : COLORS.labelNormal;
+  const borderColor = isFocused ? COLORS.primary : COLORS.borderNormal;
 
   return (
-    <View 
-      style={[
-        styles.container, 
-        { 
-          borderColor: borderColor,
-          backgroundColor: FORM_BACKGROUND,
-        }
-      ]}
-    >
-      {/* Label Animasi */}
+    <View style={[styles.container, { borderColor }]}>
       <Animated.Text
         style={[
           styles.label,
           {
-            transform: [
-              { translateY },
-              { translateX: -5 },
-              { scale },
-            ],
-            opacity,
+            transform: [{ translateY }, { translateX }, { scale }],
             color: labelColor,
-            backgroundColor: FORM_BACKGROUND,
           },
+          labelStyle,
         ]}
       >
         {label}
       </Animated.Text>
 
-      {/* Input - FIXED: Hilangkan paddingTop, gunakan textAlignVertical */}
-      <TextInput
-        {...rest}
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        onFocus={() => setInternalIsFocused(true)}
-        onBlur={() => setInternalIsFocused(false)}
-        placeholder=""
-        placeholderTextColor="#bdc3c7"
-        textAlignVertical="center" // Untuk Android
-      />
+      <View style={styles.inputRow}>
+        {icon && <View style={styles.iconContainer}>{icon}</View>}
+
+        <TextInput
+          {...rest}
+          value={value}
+          onChangeText={onChangeText}
+          style={[styles.input, inputStyle]}
+          secureTextEntry={secure}
+          cursorColor={COLORS.primary}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+
+        {isPassword && (
+          <TouchableOpacity
+            onPress={() => setSecure(!secure)}
+            style={styles.eyeIcon}
+            activeOpacity={0.7}
+          >
+            {secure ? (
+              <EyeOff size={20} color={isFocused ? COLORS.primary : COLORS.labelNormal} />
+            ) : (
+              <Eye size={20} color={COLORS.primary} />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -123,38 +128,47 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
 const styles = StyleSheet.create({
   container: {
     height: 60,
-    borderWidth: 1,
-    borderRadius: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
     marginBottom: 20,
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
     justifyContent: 'center',
+    backgroundColor: COLORS.background,
   },
   label: {
     position: 'absolute',
-    left: 15,
+    left: 16,                          // ← Fixed base position
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 4,
+    fontSize: 14,
+    fontFamily: 'PoppinsRegular',
     zIndex: 1,
-    paddingHorizontal: 5,
-    fontSize: 16,
-    fontWeight: '400',
+    top: 20,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    marginRight: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#34495e',
-    // FIXED: Hapus paddingTop, biarkan center secara natural
-    paddingVertical: 0, // Reset padding vertikal
-    paddingHorizontal: 0,
-    backgroundColor: 'transparent',
-    // Untuk iOS, pastikan alignment natural
+    color: COLORS.text,
+    paddingVertical: 0,
+    fontFamily: 'PoppinsRegular',
     ...Platform.select({
-      ios: {
-        paddingTop: 0,
-        paddingBottom: 0,
-      },
       android: {
+        paddingVertical: 0,
         textAlignVertical: 'center',
       },
     }),
+  },
+  eyeIcon: {
+    paddingLeft: 8,
+    paddingRight: 4,
   },
 });
 

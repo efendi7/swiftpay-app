@@ -1,5 +1,3 @@
-// screens/Main/ProductScreen.tsx
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -43,6 +41,8 @@ interface Product {
   id: string;
   name: string;
   price: number;
+  purchasePrice: number; // Field Baru
+  supplier: string;      // Field Baru
   stock: number;
   barcode: string;
   createdAt: any;
@@ -83,7 +83,7 @@ const ProductScreen = () => {
 
   const loadProducts = async () => {
     try {
-      setLoading(true);
+      setRefreshing(true);
       const productsRef = collection(db, 'products');
       const snapshot = await getDocs(query(productsRef));
       const productsList: Product[] = [];
@@ -104,7 +104,11 @@ const ProductScreen = () => {
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.barcode.includes(q));
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(q) || 
+        p.barcode.includes(q) ||
+        p.supplier?.toLowerCase().includes(q)
+      );
     }
 
     if (filterMode === 'specificMonth') {
@@ -177,23 +181,43 @@ const ProductScreen = () => {
     );
   };
 
-  const ProductCard = ({ item }: { item: Product }) => (
-    <View style={styles.productCard}>
-      <View style={styles.productHeader}>
-        <View style={styles.productInfo}>
-          <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productBarcode}>Barcode: {item.barcode}</Text>
+  const ProductCard = ({ item }: { item: Product }) => {
+    const margin = item.price - (item.purchasePrice || 0);
+    return (
+      <View style={styles.productCard}>
+        <View style={styles.productHeader}>
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{item.name}</Text>
+            <Text style={styles.supplierLabel}>📦 Pemasok: {item.supplier || 'Umum'}</Text>
+            <Text style={styles.productBarcode}>Code: {item.barcode}</Text>
+          </View>
+          <View style={[styles.stockBadge, { backgroundColor: item.stock < 10 ? COLORS.danger : COLORS.success }]}>
+            <Text style={styles.stockText}>{item.stock}</Text>
+          </View>
         </View>
-        <View style={[styles.stockBadge, { backgroundColor: item.stock < 10 ? COLORS.danger : COLORS.success }]}>
-          <Text style={styles.stockText}>{item.stock}</Text>
+        
+        <View style={styles.priceSection}>
+          <View style={styles.priceCol}>
+            <Text style={styles.labelTiny}>Harga Beli</Text>
+            <Text style={styles.purchaseText}>Rp {item.purchasePrice?.toLocaleString('id-ID') || 0}</Text>
+          </View>
+          <View style={[styles.priceCol, { alignItems: 'flex-end' }]}>
+            <Text style={styles.labelTiny}>Harga Jual</Text>
+            <Text style={styles.sellText}>Rp {item.price.toLocaleString('id-ID')}</Text>
+          </View>
+        </View>
+
+        <View style={styles.productFooter}>
+          <Text style={styles.dateText}>{item.createdAt?.toDate().toLocaleDateString('id-ID')}</Text>
+          <View style={[styles.profitBadge, { backgroundColor: margin >= 0 ? '#E8F5E9' : '#FFEBEE' }]}>
+            <Text style={[styles.profitText, { color: margin >= 0 ? COLORS.success : COLORS.danger }]}>
+              Untung: Rp {margin.toLocaleString('id-ID')}
+            </Text>
+          </View>
         </View>
       </View>
-      <View style={styles.productFooter}>
-        <Text style={styles.priceText}>Rp {item.price.toLocaleString('id-ID')}</Text>
-        <Text style={styles.dateText}>{item.createdAt?.toDate().toLocaleDateString('id-ID')}</Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   if (loading && products.length === 0) {
     return (
@@ -208,16 +232,21 @@ const ProductScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Daftar Produk</Text>
+        <Text style={styles.headerTitle}>Manajemen Produk</Text>
         <View style={styles.searchContainer}>
-          <TextInput style={styles.searchInput} placeholder="Cari nama atau barcode..." value={searchQuery}
-            onChangeText={setSearchQuery} placeholderTextColor={COLORS.textLight} />
+          <TextInput 
+            style={styles.searchInput} 
+            placeholder="Cari nama, barcode, atau supplier..." 
+            value={searchQuery}
+            onChangeText={setSearchQuery} 
+            placeholderTextColor={COLORS.textLight} 
+          />
           {searchQuery ? <TouchableOpacity onPress={() => setSearchQuery('')}><Text style={styles.clearIcon}>✕</Text></TouchableOpacity> : null}
         </View>
       </View>
 
       <TouchableOpacity style={styles.toggleButton} onPress={() => setIsFilterExpanded(!isFilterExpanded)}>
-        <Text style={styles.toggleText}>{isFilterExpanded ? '↑ Sembunyikan Filter' : '↓ Filter & Urutkan'}</Text>
+        <Text style={styles.toggleText}>{isFilterExpanded ? '↑ Tutup Filter' : '↓ Filter & Urutkan'}</Text>
         <Text style={styles.countText}>{filteredProducts.length} Produk</Text>
       </TouchableOpacity>
 
@@ -241,7 +270,7 @@ const ProductScreen = () => {
           {renderDateRangePicker()}
           <View style={styles.row}>
             <TouchableOpacity style={[styles.sortBtn, sortType === 'stock-high' && styles.chipActive]} onPress={() => setSortType('stock-high')}>
-              <Text style={[styles.chipText, sortType === 'stock-high' && styles.chipTextActive]}>Stok ↑</Text>
+              <Text style={[styles.chipText, sortType === 'stock-high' && styles.chipTextActive]}>Stok Tinggi</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.sortBtn, sortType === 'newest' && styles.chipActive]} onPress={() => setSortType('newest')}>
               <Text style={[styles.chipText, sortType === 'newest' && styles.chipTextActive]}>Terbaru</Text>
@@ -250,9 +279,14 @@ const ProductScreen = () => {
         </View>
       </Collapsible>
 
-      <FlatList data={filteredProducts} renderItem={({ item }) => <ProductCard item={item} />}
-        keyExtractor={item => item.id} contentContainerStyle={{ padding: 16 }}
-        refreshing={refreshing} onRefresh={loadProducts} />
+      <FlatList 
+        data={filteredProducts} 
+        renderItem={({ item }) => <ProductCard item={item} />}
+        keyExtractor={item => item.id} 
+        contentContainerStyle={{ padding: 16 }}
+        refreshing={refreshing} 
+        onRefresh={loadProducts} 
+      />
     </SafeAreaView>
   );
 };
@@ -263,33 +297,40 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 10, color: COLORS.textLight },
   header: { padding: 16, backgroundColor: COLORS.primary },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF', marginBottom: 12 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 10, paddingHorizontal: 10 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 10, paddingHorizontal: 12 },
   searchInput: { flex: 1, paddingVertical: 10, color: COLORS.textDark },
-  clearIcon: { padding: 5, color: COLORS.textLight },
+  clearIcon: { padding: 5, color: COLORS.textLight, fontSize: 18 },
   toggleButton: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, backgroundColor: '#FFF', borderBottomWidth: 1, borderColor: COLORS.border },
   toggleText: { color: COLORS.secondary, fontWeight: 'bold' },
   countText: { color: COLORS.textLight },
   filterBox: { backgroundColor: '#FFF', padding: 15, borderBottomWidth: 1, borderColor: COLORS.border },
   row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  chip: { flex: 1, padding: 10, backgroundColor: COLORS.background, borderRadius: 8, alignItems: 'center' },
+  chip: { flex: 1, padding: 10, backgroundColor: COLORS.background, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
   sortBtn: { flex: 1, padding: 10, backgroundColor: '#F0F0F0', borderRadius: 8, alignItems: 'center' },
-  chipActive: { backgroundColor: COLORS.secondary },
+  chipActive: { backgroundColor: COLORS.secondary, borderColor: COLORS.secondary },
   chipText: { color: COLORS.textDark, fontSize: 12 },
   chipTextActive: { color: '#FFF', fontWeight: 'bold' },
   
-  // Card Styles yang diperbaiki
-  productCard: { backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginBottom: 12, elevation: 2 },
-  productHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  productInfo: { flex: 1 }, // Ini property yang tadi dilaporkan hilang
+  productCard: { backgroundColor: '#FFF', padding: 16, borderRadius: 16, marginBottom: 12, elevation: 3, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4 },
+  productHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  productInfo: { flex: 1 },
   productName: { fontSize: 16, fontWeight: 'bold', color: COLORS.textDark },
-  productBarcode: { fontSize: 12, color: COLORS.textLight },
+  supplierLabel: { fontSize: 12, color: COLORS.secondary, marginTop: 4, fontWeight: '600' },
+  productBarcode: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
   stockBadge: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   stockText: { color: '#FFF', fontWeight: 'bold' },
-  productFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 },
-  priceText: { fontSize: 16, fontWeight: 'bold', color: COLORS.secondary },
-  dateText: { fontSize: 12, color: COLORS.textLight },
+  
+  priceSection: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#F1F5F9', marginTop: 5 },
+  priceCol: { flex: 1 },
+  labelTiny: { fontSize: 10, color: COLORS.textLight, marginBottom: 2, textTransform: 'uppercase' },
+  purchaseText: { fontSize: 14, color: COLORS.textDark, fontWeight: '500' },
+  sellText: { fontSize: 15, color: COLORS.secondary, fontWeight: 'bold' },
 
-  // Picker Styles
+  productFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  dateText: { fontSize: 11, color: COLORS.textLight },
+  profitBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  profitText: { fontSize: 11, fontWeight: 'bold' },
+
   pickerContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginVertical: 10 },
   arrowButton: { padding: 10 },
   arrowText: { fontSize: 20, color: COLORS.secondary, fontWeight: 'bold' },

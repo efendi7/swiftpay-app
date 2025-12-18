@@ -1,21 +1,22 @@
-// src/models/Product.ts
-
-/**
- * Interface untuk merepresentasikan data Produk di Firestore.
- * * Sesuai dengan entitas PRODUCT pada ERD.
- */
 export interface Product {
-    /** ID Dokumen di Firestore (biasanya sama dengan product_id jika disimpan) */
-    id: string; 
-    /** Nama Produk (String) */
-    name: string; 
-    /** Kode Barcode (String, harus unik) */
-    barcode: string;
-    /** Harga Jual (Double/Number) */
-    price: number; 
-    /** Stok tersedia (Integer) */
-    stock: number;
-    /** Timestamp dibuat/diupdate (Opsional) */
-    createdAt?: Date; 
-    updatedAt?: Date;
+  id: string;
+  name: string;
+  barcode: string;
+  price: number;
+  purchasePrice: number;
+  supplier: string;
+  category: string; // Tambahan
+  stock: number;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface ProductFormData {
+  name: string;
+  price: string;
+  purchasePrice: string;
+  supplier: string;
+  category: string; // Tambahan
+  stock: string;
+  barcode: string;
 }

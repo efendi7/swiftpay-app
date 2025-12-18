@@ -24,7 +24,8 @@
         {
           "cameraPermission": "Izinkan aplikasi mengakses kamera untuk scan barcode produk."
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

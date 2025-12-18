@@ -11,12 +11,16 @@ import {
   ActivityIndicator,
   TextInput,
   Platform,
+  Animated,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import Collapsible from 'react-native-collapsible';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTransactions } from '../../hooks/useTransaction';
 import { formatCurrency, getDisplayId, formatDate } from '../../utils/transactionsUtils';
 import { Transaction } from '../../hooks/useTransaction';
+import { Search, X, ChevronDown, ChevronUp, Calendar, Filter } from 'lucide-react-native';
 
 type FilterMode = 'today' | 'week' | 'month' | 'all' | 'specificMonth' | 'dateRange';
 
@@ -25,12 +29,26 @@ const MONTH_NAMES = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
 
+const COLORS = {
+  primary: '#1C3A5A',
+  secondary: '#00A79D',
+  accent: '#F58220',
+  background: '#F5F5F5',
+  cardBg: '#FFFFFF',
+  textDark: '#444444',
+  textLight: '#7f8c8d',
+  success: '#4CAF50',
+  danger: '#F44336',
+};
+
 const TransactionScreen = () => {
+  const insets = useSafeAreaInsets();
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('today');
   const [selectedSort, setSelectedSort] = useState<'latest' | 'oldest'>('latest');
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [filterHeight] = useState(new Animated.Value(0));
 
   // Untuk filter bulan spesifik
   const currentYear = new Date().getFullYear();
@@ -65,6 +83,15 @@ const TransactionScreen = () => {
     }, 500);
     return () => clearTimeout(timeoutId);
   }, [searchInput]);
+
+  // Animasi filter toggle
+  useEffect(() => {
+    Animated.timing(filterHeight, {
+      toValue: isFilterExpanded ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isFilterExpanded]);
 
   // Client-side instant filter
   const filteredTransactions = useCallback(() => {
@@ -103,22 +130,37 @@ const TransactionScreen = () => {
     Alert.alert(title, message, [{ text: 'Tutup' }]);
   };
 
+  const toggleFilter = () => {
+    setIsFilterExpanded(!isFilterExpanded);
+  };
+
+  const handleFilterSelect = (mode: FilterMode) => {
+    setFilterMode(mode);
+    
+    // Tutup filter otomatis untuk filter cepat
+    if (mode !== 'specificMonth' && mode !== 'dateRange') {
+      setIsFilterExpanded(false);
+    }
+
+    // Reset state filter lain
+    if (mode !== 'specificMonth') {
+      setSelectedMonth(new Date().getMonth());
+      setSelectedYear(currentYear);
+    }
+    if (mode !== 'dateRange') {
+      setStartDate(null);
+      setEndDate(null);
+    }
+  };
+
   const renderTransactionItem = ({ item }: { item: Transaction }) => {
     const displayId = getDisplayId(item);
 
     return (
       <TouchableOpacity style={styles.transactionCard} onPress={() => showTransactionDetail(item)}>
-        <View style={styles.transactionHeader}>
-          <View style={styles.leftHeader}>
+        <View style={styles.cardHeader}>
+          <View style={styles.idBadge}>
             <Text style={styles.transactionId}>{displayId}</Text>
-            {isAdmin && item.cashierName && (
-              <View style={styles.cashierInfo}>
-                <Text style={styles.cashierName}>{item.cashierName}</Text>
-                {item.cashierEmail && (
-                  <Text style={styles.cashierEmail}>{item.cashierEmail}</Text>
-                )}
-              </View>
-            )}
           </View>
           <Text style={styles.transactionDate}>
             {new Date(item.date.toMillis()).toLocaleDateString('id-ID', {
@@ -130,8 +172,17 @@ const TransactionScreen = () => {
           </Text>
         </View>
 
-        <View style={styles.transactionBody}>
-          <Text style={styles.itemCount}>{item.items.length} item</Text>
+        {isAdmin && item.cashierName && (
+          <View style={styles.cashierSection}>
+            <Text style={styles.cashierLabel}>Kasir:</Text>
+            <Text style={styles.cashierName}>{item.cashierName}</Text>
+          </View>
+        )}
+
+        <View style={styles.cardFooter}>
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemCount}>{item.items.length} item</Text>
+          </View>
           <Text style={styles.transactionTotal}>{formatCurrency(item.total)}</Text>
         </View>
       </TouchableOpacity>
@@ -140,28 +191,10 @@ const TransactionScreen = () => {
 
   const renderFilterButton = (mode: FilterMode, label: string) => (
     <TouchableOpacity
-      style={[styles.filterButton, filterMode === mode && styles.filterButtonActive]}
-      onPress={() => {
-        setFilterMode(mode);
-        
-        // --- TAMBAHKAN INI ---
-        // Tutup filter otomatis jika memilih filter cepat (bukan bulan/rentang tanggal)
-        if (mode !== 'specificMonth' && mode !== 'dateRange') {
-          setIsFilterExpanded(false);
-        }
-        // --------------------
-
-        if (mode !== 'specificMonth') {
-          setSelectedMonth(new Date().getMonth());
-          setSelectedYear(currentYear);
-        }
-        if (mode !== 'dateRange') {
-          setStartDate(null);
-          setEndDate(null);
-        }
-      }}
+      style={[styles.filterChip, filterMode === mode && styles.filterChipActive]}
+      onPress={() => handleFilterSelect(mode)}
     >
-      <Text style={[styles.filterButtonText, filterMode === mode && styles.filterButtonTextActive]}>
+      <Text style={[styles.filterChipText, filterMode === mode && styles.filterChipTextActive]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -169,10 +202,10 @@ const TransactionScreen = () => {
 
   const renderSortButton = (sort: typeof selectedSort, label: string) => (
     <TouchableOpacity
-      style={[styles.sortButton, selectedSort === sort && styles.sortButtonActive]}
+      style={[styles.sortChip, selectedSort === sort && styles.sortChipActive]}
       onPress={() => setSelectedSort(sort)}
     >
-      <Text style={[styles.sortButtonText, selectedSort === sort && styles.sortButtonTextActive]}>
+      <Text style={[styles.sortChipText, selectedSort === sort && styles.sortChipTextActive]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -182,9 +215,9 @@ const TransactionScreen = () => {
     if (filterMode !== 'specificMonth') return null;
 
     return (
-      <View style={styles.pickerContainer}>
+      <View style={styles.monthPickerContainer}>
         <TouchableOpacity
-          style={styles.arrowButton}
+          style={styles.monthArrow}
           onPress={() => {
             if (selectedMonth === 0) {
               setSelectedMonth(11);
@@ -194,15 +227,18 @@ const TransactionScreen = () => {
             }
           }}
         >
-          <Text style={styles.arrowText}>←</Text>
+          <Text style={styles.arrowText}>◀</Text>
         </TouchableOpacity>
 
-        <Text style={styles.monthYearText}>
-          {MONTH_NAMES[selectedMonth]} {selectedYear}
-        </Text>
+        <View style={styles.monthDisplay}>
+          <Calendar size={18} color={COLORS.secondary} />
+          <Text style={styles.monthYearText}>
+            {MONTH_NAMES[selectedMonth]} {selectedYear}
+          </Text>
+        </View>
 
         <TouchableOpacity
-          style={styles.arrowButton}
+          style={styles.monthArrow}
           onPress={() => {
             if (selectedMonth === 11) {
               setSelectedMonth(0);
@@ -212,7 +248,7 @@ const TransactionScreen = () => {
             }
           }}
         >
-          <Text style={styles.arrowText}>→</Text>
+          <Text style={styles.arrowText}>▶</Text>
         </TouchableOpacity>
       </View>
     );
@@ -226,13 +262,17 @@ const TransactionScreen = () => {
 
     return (
       <View style={styles.dateRangeContainer}>
-        <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
-          <Text style={styles.dateButtonText}>Dari: {formatDateDisplay(startDate)}</Text>
-        </TouchableOpacity>
+        <View style={styles.dateRangeRow}>
+          <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
+            <Text style={styles.dateLabel}>Dari:</Text>
+            <Text style={styles.dateValue}>{formatDateDisplay(startDate)}</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
-          <Text style={styles.dateButtonText}>Sampai: {formatDateDisplay(endDate)}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
+            <Text style={styles.dateLabel}>Sampai:</Text>
+            <Text style={styles.dateValue}>{formatDateDisplay(endDate)}</Text>
+          </TouchableOpacity>
+        </View>
 
         {showStartPicker && (
           <DateTimePicker
@@ -265,7 +305,7 @@ const TransactionScreen = () => {
     if (!loadingMore) return null;
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#00A79D" />
+        <ActivityIndicator size="small" color={COLORS.secondary} />
         <Text style={styles.footerText}>Memuat lebih banyak...</Text>
       </View>
     );
@@ -282,77 +322,110 @@ const TransactionScreen = () => {
   if (loading && transactions.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#00A79D" />
+        <ActivityIndicator size="large" color={COLORS.secondary} />
         <Text style={styles.loadingText}>Memuat transaksi...</Text>
       </View>
     );
   }
 
+  const maxHeight = filterHeight.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 400],
+  });
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          {isAdmin ? 'Riwayat Transaksi Semua Kasir' : 'Riwayat Transaksi Saya'}
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <LinearGradient colors={[COLORS.primary, '#2c537a']} style={StyleSheet.absoluteFill} />
+        <Text style={styles.title}>Laporan Penjualan</Text>
+        <Text style={styles.subtitle}>
+          {isAdmin ? 'Semua Transaksi Kasir' : 'Transaksi Saya'}
         </Text>
-        <Text style={styles.subtitle}>Total: {filteredTransactions().length} transaksi</Text>
       </View>
 
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
+        <Search size={20} color={COLORS.textLight} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder={isAdmin ? "Cari nomor, kasir, atau email..." : "Cari nomor transaksi..."}
+          placeholder={isAdmin ? "Cari nomor, kasir, email..." : "Cari nomor transaksi..."}
           value={searchInput}
           onChangeText={setSearchInput}
           placeholderTextColor="#999"
         />
         {searchInput.length > 0 && (
           <TouchableOpacity style={styles.clearButton} onPress={() => setSearchInput('')}>
-            <Text style={styles.clearButtonText}>✕</Text>
+            <X size={16} color="#FFF" />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Tombol Toggle Filter */}
-      <TouchableOpacity
-        style={styles.toggleFilterButton}
-        onPress={() => setIsFilterExpanded(!isFilterExpanded)}
-      >
-        <Text style={styles.toggleFilterText}>
-          {isFilterExpanded ? '↑ Sembunyikan Filter' : '↓ Tampilkan Filter Lanjutan'}
+      {/* Summary Info */}
+      <View style={styles.summaryBar}>
+        <Text style={styles.summaryText}>
+          Total: <Text style={styles.summaryValue}>{filteredTransactions().length}</Text> transaksi
         </Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.filterToggle} onPress={toggleFilter}>
+          <Filter size={16} color={COLORS.secondary} />
+          <Text style={styles.filterToggleText}>Filter</Text>
+          {isFilterExpanded ? (
+            <ChevronUp size={16} color={COLORS.secondary} />
+          ) : (
+            <ChevronDown size={16} color={COLORS.secondary} />
+          )}
+        </TouchableOpacity>
+      </View>
 
-      {/* Semua Filter dalam Collapsible */}
-      <Collapsible collapsed={!isFilterExpanded}>
-        <View style={styles.filterSection}>
-          <View style={styles.filterRow}>
-            {renderFilterButton('today', 'Hari Ini')}
-            {renderFilterButton('week', 'Minggu Ini')}
-            {renderFilterButton('month', 'Bulan Ini')}
-            {renderFilterButton('all', 'Semua')}
+      {/* Filter Section dengan Animated */}
+      <Animated.View style={[styles.filterWrapper, { maxHeight, overflow: 'hidden' }]}>
+        <View style={styles.filterContent}>
+          {/* Filter Cepat */}
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterGroupLabel}>Periode</Text>
+            <View style={styles.chipRow}>
+              {renderFilterButton('today', 'Hari Ini')}
+              {renderFilterButton('week', 'Minggu Ini')}
+            </View>
+            <View style={styles.chipRow}>
+              {renderFilterButton('month', 'Bulan Ini')}
+              {renderFilterButton('all', 'Semua')}
+            </View>
           </View>
 
-          <View style={styles.filterRow}>
-            {renderFilterButton('specificMonth', 'Bulan')}
-            {renderFilterButton('dateRange', 'Rentang Tanggal')}
+          {/* Filter Lanjutan */}
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterGroupLabel}>Filter Lanjutan</Text>
+            <View style={styles.chipRow}>
+              {renderFilterButton('specificMonth', 'Pilih Bulan')}
+              {renderFilterButton('dateRange', 'Rentang Tanggal')}
+            </View>
           </View>
 
           {renderMonthPicker()}
           {renderDateRangePicker()}
 
-          <View style={styles.sortContainer}>
-            {renderSortButton('latest', 'Terbaru')}
-            {renderSortButton('oldest', 'Terlama')}
+          {/* Sorting */}
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterGroupLabel}>Urutkan</Text>
+            <View style={styles.chipRow}>
+              {renderSortButton('latest', 'Terbaru')}
+              {renderSortButton('oldest', 'Terlama')}
+            </View>
           </View>
         </View>
-      </Collapsible>
+      </Animated.View>
 
+      {/* Transaction List */}
       <FlatList
         data={filteredTransactions()}
         renderItem={renderTransactionItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.listContainer,
+          { paddingBottom: insets.bottom + 90 }, // Extra space untuk bottom nav
           filteredTransactions().length === 0 && styles.listContainerEmpty
         ]}
         ListEmptyComponent={renderEmpty}
@@ -371,72 +444,301 @@ const TransactionScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
-  header: { backgroundColor: '#00A79D', padding: 20, paddingTop: 40 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#FFF' },
-  subtitle: { fontSize: 14, color: '#E0F7FA', marginTop: 4 },
-  searchContainer: { padding: 16, backgroundColor: '#FFF', position: 'relative' },
-  searchInput: { backgroundColor: '#F5F5F5', padding: 12, paddingRight: 40, borderRadius: 8, fontSize: 16 },
-  clearButton: { position: 'absolute', right: 24, top: '50%', transform: [{ translateY: -12 }], width: 24, height: 24, borderRadius: 12, backgroundColor: '#CCC', justifyContent: 'center', alignItems: 'center' },
-  clearButtonText: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
   
-  // Styles Baru untuk Collapsible
-  toggleFilterButton: {
-    backgroundColor: '#FFF',
-    padding: 12,
+  // Header
+  header: { 
+    paddingHorizontal: 25,
+    paddingBottom: 25,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',
+    elevation: 5,
+  },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#FFF' },
+  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  
+  // Search
+  searchContainer: { 
+    flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
+    backgroundColor: '#FFF', 
+    marginHorizontal: 20,
+    marginTop: -15,
+    marginBottom: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  toggleFilterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#00A79D',
+  searchIcon: { marginRight: 8 },
+  searchInput: { 
+    flex: 1,
+    padding: 12, 
+    fontSize: 15,
+    color: COLORS.textDark,
   },
-  filterSection: {
-    backgroundColor: '#FFF',
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
+  clearButton: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12, 
+    backgroundColor: COLORS.textLight, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
   },
 
-  filterRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: '#FFF', gap: 8 },
-  filterButton: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#F5F5F5', alignItems: 'center' },
-  filterButtonActive: { backgroundColor: '#00A79D' },
-  filterButtonText: { fontSize: 12, fontWeight: '600', color: '#666' },
-  filterButtonTextActive: { color: '#FFF' },
-  pickerContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: '#FFF', gap: 20 },
-  arrowButton: { padding: 10 },
-  arrowText: { fontSize: 24, color: '#00A79D' },
-  monthYearText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  dateRangeContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#FFF', gap: 12 },
-  dateButton: { flex: 1, backgroundColor: '#F0F0F0', padding: 14, borderRadius: 8, alignItems: 'center' },
-  dateButtonText: { fontSize: 14, color: '#333' },
-  sortContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#FFF', gap: 8 },
-  sortButton: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#F5F5F5', alignItems: 'center' },
-  sortButtonActive: { backgroundColor: '#00A79D' },
-  sortButtonText: { fontSize: 12, fontWeight: '600', color: '#666' },
-  sortButtonTextActive: { color: '#FFF' },
+  // Summary Bar
+  summaryBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  summaryText: { fontSize: 14, color: COLORS.textLight },
+  summaryValue: { fontWeight: 'bold', color: COLORS.textDark },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+  },
+  filterToggleText: { fontSize: 14, fontWeight: '600', color: COLORS.secondary },
+
+  // Filter Section
+  filterWrapper: {
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  filterContent: {
+    padding: 16,
+  },
+  filterGroup: {
+    marginBottom: 16,
+  },
+  filterGroupLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    marginBottom: 8,
+  },
+  chipRow: { 
+    flexDirection: 'row', 
+    gap: 8,
+    marginBottom: 8,
+  },
+  filterChip: { 
+    flex: 1,
+    paddingVertical: 10, 
+    paddingHorizontal: 12,
+    borderRadius: 10, 
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterChipActive: { 
+    backgroundColor: COLORS.secondary,
+    borderColor: COLORS.secondary,
+  },
+  filterChipText: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: COLORS.textDark,
+  },
+  filterChipTextActive: { color: '#FFF' },
   
-  listContainer: { padding: 16 },
+  sortChip: { 
+    flex: 1,
+    paddingVertical: 10, 
+    paddingHorizontal: 12,
+    borderRadius: 10, 
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  sortChipActive: { 
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  sortChipText: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: COLORS.textDark,
+  },
+  sortChipTextActive: { color: '#FFF' },
+
+  // Month Picker
+  monthPickerContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  monthArrow: { 
+    padding: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+  },
+  arrowText: { 
+    fontSize: 18, 
+    color: COLORS.secondary,
+    fontWeight: 'bold',
+  },
+  monthDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  monthYearText: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: COLORS.textDark,
+  },
+
+  // Date Range Picker
+  dateRangeContainer: { 
+    marginBottom: 12,
+  },
+  dateRangeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateButton: { 
+    flex: 1, 
+    backgroundColor: COLORS.background, 
+    padding: 14, 
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    marginBottom: 4,
+  },
+  dateValue: { 
+    fontSize: 14, 
+    color: COLORS.textDark,
+    fontWeight: '600',
+  },
+
+  // Transaction List
+  listContainer: { 
+    padding: 16,
+  },
   listContainerEmpty: { flex: 1 },
-  transactionCard: { backgroundColor: '#FFF', borderRadius: 12, padding: 16, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-  transactionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  leftHeader: { flex: 1, marginRight: 12 },
-  transactionId: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 4 },
-  cashierInfo: { marginTop: 4 },
-  cashierName: { fontSize: 14, color: '#00A79D', fontWeight: '600' },
-  cashierEmail: { fontSize: 12, color: '#666', marginTop: 2 },
-  transactionDate: { fontSize: 12, color: '#999', textAlign: 'right' },
-  transactionBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  itemCount: { fontSize: 14, color: '#666' },
-  transactionTotal: { fontSize: 18, fontWeight: 'bold', color: '#00A79D' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
-  emptyText: { fontSize: 16, color: '#999', textAlign: 'center' },
-  footerLoader: { paddingVertical: 20, alignItems: 'center' },
-  footerText: { marginTop: 8, fontSize: 14, color: '#666' },
+  
+  transactionCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 14, 
+    padding: 16, 
+    marginBottom: 12, 
+    elevation: 2, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.08, 
+    shadowRadius: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.secondary,
+  },
+  cardHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  idBadge: {
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  transactionId: { 
+    fontSize: 14, 
+    fontWeight: 'bold', 
+    color: COLORS.textDark,
+  },
+  transactionDate: { 
+    fontSize: 12, 
+    color: COLORS.textLight,
+  },
+  cashierSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  cashierLabel: {
+    fontSize: 12,
+    color: COLORS.textLight,
+  },
+  cashierName: { 
+    fontSize: 13, 
+    color: COLORS.secondary, 
+    fontWeight: '600',
+  },
+  cardFooter: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+  },
+  itemInfo: {
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  itemCount: { 
+    fontSize: 12, 
+    color: COLORS.textDark,
+    fontWeight: '600',
+  },
+  transactionTotal: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: COLORS.secondary,
+  },
+  
+  emptyContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingVertical: 60,
+  },
+  emptyText: { 
+    fontSize: 16, 
+    color: '#999', 
+    textAlign: 'center',
+  },
+  footerLoader: { 
+    paddingVertical: 20, 
+    alignItems: 'center',
+  },
+  footerText: { 
+    marginTop: 8, 
+    fontSize: 14, 
+    color: '#666',
+  },
 });
 
 export default TransactionScreen;
