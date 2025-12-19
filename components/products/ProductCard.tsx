@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Image } from 'react-native';
 import { Package, AlertCircle, X, ChevronRight, Info } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
-import { Product } from '../../models/Product';
+import { Product } from '../../types/product.types'; // Changed import
 
 interface Props {
   item: Product;

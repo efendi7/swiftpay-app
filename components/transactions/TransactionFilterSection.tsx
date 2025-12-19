@@ -1,136 +1,149 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { styles } from './styles';
-import { MonthPicker } from './MonthPicker';
-import { DateRangePicker } from './DateRangePicker';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Collapsible from 'react-native-collapsible';
+import { ChevronDown, ChevronUp, Filter, Clock, Calendar } from 'lucide-react-native';
+import { COLORS } from '../../constants/colors';
+import MonthPicker from './MonthPicker';
 
-type FilterMode = 'today' | 'week' | 'month' | 'all' | 'specificMonth' | 'dateRange';
+type SortType = 'latest' | 'oldest';
+type FilterMode = 'all' | 'specificMonth' | 'today';
 
 interface Props {
   filterMode: FilterMode;
-  selectedSort: 'latest' | 'oldest';
+  selectedSort: SortType;
   selectedMonth: number;
   selectedYear: number;
-  startDate: Date | null;
-  endDate: Date | null;
-  showStartPicker: boolean;
-  showEndPicker: boolean;
-
+  transactionCount: number;
   onFilterChange: (mode: FilterMode) => void;
-  onSortChange: (sort: 'latest' | 'oldest') => void;
+  onSortChange: (sort: SortType) => void;
   onMonthChange: (month: number) => void;
   onYearChange: (year: number) => void;
-  onStartDateChange: (date: Date) => void;
-  onEndDateChange: (date: Date) => void;
-  onShowStartPicker: (show: boolean) => void;
-  onShowEndPicker: (show: boolean) => void;
-  onClose: () => void;
 }
 
-const renderChip = (label: string, active: boolean, onPress: () => void, activeColor: string = '#00A79D') => (
-  <TouchableOpacity
-    style={[styles.filterChip, active && { backgroundColor: activeColor, borderColor: activeColor }]}
-    onPress={onPress}
-  >
-    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
-  </TouchableOpacity>
-);
-
 export const TransactionFilterSection: React.FC<Props> = (props) => {
-  const {
-    filterMode,
-    selectedSort,
-    selectedMonth,
-    selectedYear,
-    startDate,
-    endDate,
-    showStartPicker,
-    showEndPicker,
-    onFilterChange,
-    onSortChange,
-    onMonthChange,
-    onYearChange,
-    onStartDateChange,
-    onEndDateChange,
-    onShowStartPicker,
-    onShowEndPicker,
-    onClose,
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { 
+    filterMode, selectedSort, transactionCount, onFilterChange, onSortChange,
+    selectedMonth, selectedYear, onMonthChange, onYearChange
   } = props;
 
-  const handlePrevMonth = () => {
-    if (selectedMonth === 0) {
-      onMonthChange(11);
-      onYearChange(selectedYear - 1);
-    } else {
-      onMonthChange(selectedMonth - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (selectedMonth === 11) {
-      onMonthChange(0);
-      onYearChange(selectedYear + 1);
-    } else {
-      onMonthChange(selectedMonth + 1);
-    }
-  };
-
-  const handleFilterSelect = (mode: FilterMode) => {
-    onFilterChange(mode);
-    if (mode !== 'specificMonth' && mode !== 'dateRange') onClose();
-  };
-
   return (
-    <View style={styles.filterContent}>
-      <View style={styles.filterGroup}>
-        <Text style={styles.filterGroupLabel}>Periode</Text>
-        <View style={styles.chipRow}>
-          {renderChip('Hari Ini', filterMode === 'today', () => handleFilterSelect('today'))}
-          {renderChip('Minggu Ini', filterMode === 'week', () => handleFilterSelect('week'))}
+    <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.toggle} 
+        onPress={() => setIsExpanded(!isExpanded)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.toggleLeft}>
+          <Filter size={18} color={COLORS.primary} />
+          <Text style={styles.toggleText}>Filter & Urutkan</Text>
         </View>
-        <View style={styles.chipRow}>
-          {renderChip('Bulan Ini', filterMode === 'month', () => handleFilterSelect('month'))}
-          {renderChip('Semua', filterMode === 'all', () => handleFilterSelect('all'))}
+        <View style={styles.toggleRight}>
+          <Text style={styles.countText}>{transactionCount} Transaksi</Text>
+          {isExpanded ? <ChevronUp size={20} color="#94A3B8" /> : <ChevronDown size={20} color="#94A3B8" />}
         </View>
-      </View>
+      </TouchableOpacity>
 
-      <View style={styles.filterGroup}>
-        <Text style={styles.filterGroupLabel}>Filter Lanjutan</Text>
-        <View style={styles.chipRow}>
-          {renderChip('Pilih Bulan', filterMode === 'specificMonth', () => handleFilterSelect('specificMonth'))}
-          {renderChip('Rentang Tanggal', filterMode === 'dateRange', () => handleFilterSelect('dateRange'))}
+      <Collapsible collapsed={!isExpanded} duration={300}>
+        <View style={styles.filterBox}>
+          {/* BARIS 1: 3 KOLOM FILTER MODE */}
+          <View style={styles.mainRow}>
+            <TouchableOpacity 
+              style={[styles.mainBtn, filterMode === 'today' && styles.activePrimary]}
+              onPress={() => onFilterChange('today')}
+            >
+              <Clock size={16} color={filterMode === 'today' ? '#FFF' : COLORS.primary} />
+              <Text style={[styles.mainBtnText, filterMode === 'today' && styles.textWhite]}>Hari Ini</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.mainBtn, filterMode === 'specificMonth' && styles.activePrimary]}
+              onPress={() => onFilterChange('specificMonth')}
+            >
+              <Calendar size={16} color={filterMode === 'specificMonth' ? '#FFF' : COLORS.primary} />
+              <Text style={[styles.mainBtnText, filterMode === 'specificMonth' && styles.textWhite]}>Pilih Bulan</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* MONTH PICKER */}
+          <Collapsible collapsed={filterMode !== 'specificMonth'} duration={300}>
+            <View style={styles.pickerWrapper}>
+              <MonthPicker 
+                selectedMonth={selectedMonth} 
+                selectedYear={selectedYear}
+                onMonthChange={onMonthChange}
+                onYearChange={onYearChange}
+              />
+            </View>
+          </Collapsible>
+
+          {/* BARIS 2: SORTING */}
+          <Text style={styles.label}>Urutkan</Text>
+          <View style={styles.sortRow}>
+            <TouchableOpacity 
+              style={[styles.sortBtn, selectedSort === 'latest' && styles.activeSecondary]}
+              onPress={() => onSortChange('latest')}
+            >
+              <Text style={[styles.sortText, selectedSort === 'latest' && styles.textWhite]}>Terbaru</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.sortBtn, selectedSort === 'oldest' && styles.activeSecondary]}
+              onPress={() => onSortChange('oldest')}
+            >
+              <Text style={[styles.sortText, selectedSort === 'oldest' && styles.textWhite]}>Terlama</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-
-      {filterMode === 'specificMonth' && (
-        <MonthPicker
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onPrev={handlePrevMonth}
-          onNext={handleNextMonth}
-        />
-      )}
-
-      {filterMode === 'dateRange' && (
-        <DateRangePicker
-          startDate={startDate}
-          endDate={endDate}
-          showStartPicker={showStartPicker}
-          showEndPicker={showEndPicker}
-          onShowStartPicker={onShowStartPicker}
-          onShowEndPicker={onShowEndPicker}
-          onStartDateChange={onStartDateChange}
-          onEndDateChange={onEndDateChange}
-        />
-      )}
-
-      <View style={styles.filterGroup}>
-        <Text style={styles.filterGroupLabel}>Urutkan</Text>
-        <View style={styles.chipRow}>
-          {renderChip('Terbaru', selectedSort === 'latest', () => onSortChange('latest'), '#F58220')}
-          {renderChip('Terlama', selectedSort === 'oldest', () => onSortChange('oldest'), '#F58220')}
-        </View>
-      </View>
+      </Collapsible>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: { backgroundColor: '#FFF', borderBottomWidth: 1, borderColor: '#F1F5F9' },
+  toggle: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, alignItems: 'center' },
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toggleRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  toggleText: { color: '#1E293B', fontFamily: 'PoppinsSemiBold', fontSize: 14 },
+  countText: { color: '#64748B', fontFamily: 'PoppinsMedium', fontSize: 12 },
+  filterBox: { paddingHorizontal: 16, paddingBottom: 20 },
+  
+  // MAIN ROW (Filter Mode)
+  mainRow: { flexDirection: 'row', gap: 10, marginBottom: 15 },
+  mainBtn: { 
+    flex: 1, 
+    height: 45, 
+    flexDirection: 'row', 
+    gap: 8, 
+    backgroundColor: '#F8FAFC', 
+    borderRadius: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
+  mainBtnText: { color: '#64748B', fontFamily: 'PoppinsSemiBold', fontSize: 13 },
+  
+  // SORT ROW
+  label: { fontSize: 11, fontFamily: 'PoppinsBold', color: '#94A3B8', marginBottom: 8, marginLeft: 4 },
+  sortRow: { flexDirection: 'row', gap: 10 },
+  sortBtn: { 
+    flex: 1, 
+    paddingVertical: 12, 
+    backgroundColor: '#F8FAFC', 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
+  sortText: { color: '#64748B', fontSize: 12, fontFamily: 'PoppinsMedium' },
+  
+  // PICKER
+  pickerWrapper: { marginBottom: 15, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 10 },
+  
+  // ACTIVE STATES
+  activePrimary: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  activeSecondary: { backgroundColor: COLORS.secondary, borderColor: COLORS.secondary },
+  textWhite: { color: '#FFF' }
+});

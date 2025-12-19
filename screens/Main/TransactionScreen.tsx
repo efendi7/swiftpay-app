@@ -1,208 +1,151 @@
-// src/screens/Main/TransactionScreen.tsx
-
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  Animated,
-  StatusBar,
-  Alert,
-  Platform,
-} from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, StatusBar, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { useTransactions } from '../../hooks/useTransaction';
-import { Transaction } from '../../hooks/useTransaction';
-import { formatCurrency, getDisplayId, formatDate } from '../../utils/transactionsUtils';
-
-import {
-  TransactionHeader,
-  TransactionSearchBar,
-  TransactionSummaryBar,
-  TransactionFilterSection,
-  TransactionList,
-} from '../../components/transactions';
-
-import { styles, COLORS } from '../../components/transactions/styles';
-
-type FilterMode = 'today' | 'week' | 'month' | 'all' | 'specificMonth' | 'dateRange';
+import { LinearGradient } from 'expo-linear-gradient';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../../services/firebaseConfig';
+import { TransactionSearchBar, TransactionFilterSection, TransactionList } from '../../components/transactions';
+import { FilterMode, SortType, Transaction } from '../../types/transaction.type';
 
 const TransactionScreen = () => {
   const insets = useSafeAreaInsets();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // TODO: Sesuaikan dengan auth logic
 
-  // State untuk search
   const [searchInput, setSearchInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedSort, setSelectedSort] = useState<SortType>('latest');
 
-  // State untuk filter & sort
-  const [filterMode, setFilterMode] = useState<FilterMode>('today');
-  const [selectedSort, setSelectedSort] = useState<'latest' | 'oldest'>('latest');
-  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-  const [filterHeight] = useState(new Animated.Value(0));
-
-  // State untuk filter spesifik bulan
   const currentYear = new Date().getFullYear();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  // State untuk filter rentang tanggal
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  // FETCH ALL TRANSACTIONS - Mirip ProductScreen
+  const loadTransactions = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      
+      const transactionsList: Transaction[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Transaction));
+      
+      setTransactions(transactionsList);
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-  // Hook untuk fetch transaksi
-  const {
-    transactions,
-    loading,
-    isAdmin,
-    refetch,
-    loadingMore,
-    hasMore,
-    loadMore,
-  } = useTransactions(filterMode, selectedSort, searchQuery, {
-    month: filterMode === 'specificMonth' ? selectedMonth : undefined,
-    year: filterMode === 'specificMonth' ? selectedYear : undefined,
-    startDate: filterMode === 'dateRange' ? startDate : undefined,
-    endDate: filterMode === 'dateRange' ? endDate : undefined,
-  });
-
-  // Debounce search input
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(searchInput);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+    loadTransactions();
+  }, [loadTransactions]);
 
-  // Animasi expand/collapse filter
-  useEffect(() => {
-    Animated.timing(filterHeight, {
-      toValue: isFilterExpanded ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [isFilterExpanded]);
+  // CLIENT-SIDE FILTERING & SORTING (Realtime - Mirip ProductScreen)
+  const filteredData = useMemo(() => {
+    let filtered = [...transactions];
 
-  // Fungsi untuk menampilkan detail transaksi
-  const showTransactionDetail = (transaction: Transaction) => {
-    const itemDetails = transaction.items
-      .map((item, index) => `${index + 1}. ${item.productName || 'Produk'} - Qty: ${item.qty} x ${formatCurrency(item.price)}`)
-      .join('\n');
-
-    const displayId = getDisplayId(transaction);
-
-    let message = `Tanggal: ${formatDate(transaction.date)}\n\nProduk:\n${itemDetails}\n\nTotal: ${formatCurrency(transaction.total)}`;
-
-    if (isAdmin && transaction.cashierName) {
-      message = `Kasir: ${transaction.cashierName}${transaction.cashierEmail ? `\nEmail: ${transaction.cashierEmail}` : ''}\n\n${message}`;
+    // 1. Filter by Search
+    if (searchInput.trim()) {
+      const lower = searchInput.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.id.toLowerCase().includes(lower) || 
+        (t.transactionNumber || '').toLowerCase().includes(lower) || 
+        (t.cashierName || '').toLowerCase().includes(lower)
+      );
     }
 
-    Alert.alert(`Detail Transaksi ${displayId}`, message, [{ text: 'Tutup' }]);
-  };
+    // 2. Filter by Time Mode
+    if (filterMode === 'today') {
+      const today = new Date();
+      filtered = filtered.filter(t => {
+        if (!t.createdAt) return false;
+        const date = t.createdAt.toDate();
+        return date.toDateString() === today.toDateString();
+      });
+    }
 
-  // Hitung jumlah transaksi setelah client-side filter (untuk summary)
-  const filteredCount = useCallback(() => {
-    if (!searchInput.trim()) return transactions.length;
+    if (filterMode === 'specificMonth') {
+      filtered = filtered.filter(t => {
+        if (!t.createdAt) return false;
+        const date = t.createdAt.toDate();
+        return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
+      });
+    }
 
-    const lower = searchInput.toLowerCase();
-    return transactions.filter((t) =>
-      t.id.toLowerCase().includes(lower) ||
-      (t.transactionNumber || '').toLowerCase().includes(lower) ||
-      (t.cashierName || '').toLowerCase().includes(lower) ||
-      (t.cashierEmail || '').toLowerCase().includes(lower)
-    ).length;
-  }, [transactions, searchInput]);
+    // 3. Sorting
+    filtered.sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+      const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+      
+      return selectedSort === 'latest' ? dateB - dateA : dateA - dateB;
+    });
 
-  // Loading state awal
+    return filtered;
+  }, [transactions, searchInput, filterMode, selectedSort, selectedMonth, selectedYear]);
+
   if (loading && transactions.length === 0) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={COLORS.secondary} />
-        <Text style={styles.loadingText}>Memuat transaksi...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#FFF" />
       </View>
     );
   }
 
-  const maxHeight = filterHeight.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 500], // Sesuaikan jika konten filter lebih panjang
-  });
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
+      <LinearGradient colors={['#00A79D', '#00D4C8']} style={[styles.header, { paddingTop: insets.top + 20 }]}>
+        <Text style={styles.headerTitle}>Transaksi</Text>
+        {isAdmin && <Text style={styles.adminText}>Mode Admin</Text>}
+      </LinearGradient>
 
-      {/* Header */}
-      <TransactionHeader isAdmin={isAdmin} />
+      <View style={styles.contentWrapper}>
+        <View style={styles.searchContainer}>
+          <TransactionSearchBar value={searchInput} onChangeText={setSearchInput} isAdmin={isAdmin} />
+        </View>
 
-      {/* Search Bar */}
-      <TransactionSearchBar
-        value={searchInput}
-        onChangeText={setSearchInput}
-        isAdmin={isAdmin}
-      />
-
-      {/* Summary Bar dengan Toggle Filter */}
-      <TransactionSummaryBar
-        count={filteredCount()}
-        isExpanded={isFilterExpanded}
-        onToggle={() => setIsFilterExpanded(!isFilterExpanded)}
-      />
-
-      {/* Filter Section (Animated) */}
-      <Animated.View style={{ maxHeight, overflow: 'hidden' }}>
         <TransactionFilterSection
           filterMode={filterMode}
           selectedSort={selectedSort}
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
-          startDate={startDate}
-          endDate={endDate}
-          showStartPicker={showStartPicker}
-          showEndPicker={showEndPicker}
+          transactionCount={filteredData.length}
           onFilterChange={(mode) => {
             setFilterMode(mode);
-            // Otomatis tutup filter untuk mode cepat
-            if (mode !== 'specificMonth' && mode !== 'dateRange') {
-              setIsFilterExpanded(false);
-            }
-            // Reset state yang tidak dipakai
-            if (mode !== 'specificMonth') {
-              setSelectedMonth(new Date().getMonth());
-              setSelectedYear(currentYear);
-            }
-            if (mode !== 'dateRange') {
-              setStartDate(null);
-              setEndDate(null);
-            }
+            if (mode !== 'specificMonth') setSelectedMonth(new Date().getMonth());
           }}
           onSortChange={setSelectedSort}
           onMonthChange={setSelectedMonth}
           onYearChange={setSelectedYear}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onShowStartPicker={setShowStartPicker}
-          onShowEndPicker={setShowEndPicker}
-          onClose={() => setIsFilterExpanded(false)}
         />
-      </Animated.View>
 
-      {/* Daftar Transaksi */}
-      <TransactionList
-        transactions={transactions}
-        searchInput={searchInput}
-        isAdmin={isAdmin}
-        loadingMore={loadingMore}
-        hasMore={hasMore}
-        loadMore={loadMore}
-        refetch={refetch}
-        onItemPress={showTransactionDetail}
-        insets={insets}
-      />
+        <TransactionList
+          transactions={filteredData}
+          searchInput={searchInput}
+          isAdmin={isAdmin}
+          refetch={loadTransactions}
+          insets={insets}
+        />
+      </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#00A79D' },
+  header: { paddingHorizontal: 20, paddingBottom: 25 },
+  headerTitle: { fontSize: 24, fontFamily: 'PoppinsBold', color: '#FFF' },
+  adminText: { color: '#E0F2F1', fontSize: 12, fontFamily: 'PoppinsMedium' },
+  contentWrapper: { flex: 1, backgroundColor: '#F8FAFC', borderTopLeftRadius: 25, borderTopRightRadius: 25, overflow: 'hidden' },
+  searchContainer: { padding: 16 }
+});
 
 export default TransactionScreen;

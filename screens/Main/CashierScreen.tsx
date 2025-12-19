@@ -161,20 +161,23 @@ const CashierScreen = () => {
           });
         });
 
-        // 5️⃣ Simpan transaksi dengan nomor urut
-        const newTransRef = doc(collection(db, 'transactions'));
-        transaction.set(newTransRef, {
-          cashierId: user.uid,
-          total: calculateTotal(),
-          date: serverTimestamp(),
-          transactionNumber: transactionNumber, // ← NOMOR URUT RAPI
-          items: cart.map(item => ({
-            productId: item.id,
-            productName: item.name,
-            qty: item.qty,
-            price: item.price,
-          })),
-        });
+        // 5️⃣ Simpan transaksi dengan nama kasir
+const newTransRef = doc(collection(db, 'transactions'));
+transaction.set(newTransRef, {
+  cashierId: user.uid,
+  cashierName: user.displayName || user.email?.split('@')[0] || 'Kasir', // Tambahkan ini
+  cashierEmail: user.email, // Opsional: Tambahkan email juga
+  total: calculateTotal(),
+  date: serverTimestamp(),
+  createdAt: serverTimestamp(),
+  transactionNumber: transactionNumber,
+  items: cart.map(item => ({
+    productId: item.id,
+    productName: item.name,
+    qty: item.qty,
+    price: item.price,
+  })),
+});
       });
 
       // Sukses!

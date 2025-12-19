@@ -1,80 +1,56 @@
-import React, { useCallback } from 'react';
-import { FlatList, View, Text, ActivityIndicator } from 'react-native';
-import { Transaction } from '../../hooks/useTransaction';
+import React from 'react';
+import { FlatList, View, Text, StyleSheet } from 'react-native';
+import { Transaction } from '../../types/transaction.type';
 import { TransactionItemCard } from './TransactionItemCard';
-import { styles } from './styles';
 
 interface Props {
   transactions: Transaction[];
   searchInput: string;
   isAdmin: boolean;
-  loadingMore: boolean;
-  hasMore: boolean;
-  loadMore: () => void;
   refetch: () => void;
-  onItemPress: (transaction: Transaction) => void;
   insets: { bottom: number };
 }
 
 export const TransactionList: React.FC<Props> = ({
-  transactions,
-  searchInput,
-  isAdmin,
-  loadingMore,
-  hasMore,
-  loadMore,
-  refetch,
-  onItemPress,
-  insets,
+  transactions, searchInput, isAdmin, refetch, insets,
 }) => {
-  const clientFiltered = useCallback(() => {
-    if (!searchInput.trim()) return transactions;
-    const lower = searchInput.toLowerCase();
-    return transactions.filter(t =>
-      t.id.toLowerCase().includes(lower) ||
-      (t.transactionNumber || '').toLowerCase().includes(lower) ||
-      (t.cashierName || '').toLowerCase().includes(lower) ||
-      (t.cashierEmail || '').toLowerCase().includes(lower)
-    );
-  }, [transactions, searchInput]);
-
-  const renderItem = ({ item }: { item: Transaction }) => (
-    <TransactionItemCard transaction={item} isAdmin={isAdmin} onPress={() => onItemPress(item)} />
-  );
-
-  const renderFooter = () => loadingMore ? (
-    <View style={styles.footerLoader}>
-      <ActivityIndicator size="small" color="#00A79D" />
-      <Text style={styles.footerText}>Memuat lebih banyak...</Text>
-    </View>
-  ) : null;
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>
-        {searchInput ? 'Tidak ada transaksi yang sesuai' : 'Tidak ada transaksi'}
-      </Text>
-    </View>
-  );
-
   return (
     <FlatList
-      data={clientFiltered()}
-      renderItem={renderItem}
-      keyExtractor={item => item.id}
+      data={transactions}
+      renderItem={({ item }) => <TransactionItemCard transaction={item} isAdmin={isAdmin} />}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       contentContainerStyle={[
-        styles.listContainer,
-        { paddingBottom: insets.bottom + 90 },
-        clientFiltered().length === 0 && styles.listContainerEmpty
+        styles.contentContainer,
+        { paddingBottom: insets.bottom + 100, paddingTop: 20 },
       ]}
-      ListEmptyComponent={renderEmpty}
-      ListFooterComponent={renderFooter}
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
+            {searchInput ? 'Tidak ditemukan' : 'Belum ada transaksi'}
+          </Text>
+        </View>
+      }
       onRefresh={refetch}
       refreshing={false}
-      onEndReached={() => {
-        if (hasMore && !loadingMore && !searchInput) loadMore();
-      }}
-      onEndReachedThreshold={0.5}
+      showsVerticalScrollIndicator={false}
     />
   );
 };
+
+const styles = StyleSheet.create({
+  contentContainer: {
+    paddingHorizontal: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 300,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#94A3B8',
+    fontSize: 16,
+    fontFamily: 'PoppinsRegular',
+  },
+});
