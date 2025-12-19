@@ -8,6 +8,7 @@ import {
   BarChart2,
   User,
   PlusCircle,
+  Scan,
 } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
 
@@ -22,63 +23,76 @@ export const BottomNavigation: React.FC<Props> = ({
   insets,
 }) => {
   const currentRoute = state.routes[state.index].name;
+  const isCashierRole = state.routeNames.includes('CashierDashboard');
 
   const isActive = (routeName: string) => currentRoute === routeName;
+
+  const handleDashboardPress = () => {
+    navigation.navigate(isCashierRole ? 'CashierDashboard' : 'AdminDashboard');
+  };
 
   return (
     <View style={[styles.footerWrapper, { paddingBottom: insets.bottom }]}>
       <View style={styles.navContainer}>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('AdminDashboard')}
-        >
+        
+        {/* 1. DASHBOARD */}
+        <TouchableOpacity style={styles.navItem} onPress={handleDashboardPress}>
           <LayoutDashboard
-            size={24}
-            color={isActive('AdminDashboard') ? COLORS.secondary : COLORS.textLight}
+            size={22}
+            color={isActive('AdminDashboard') || isActive('CashierDashboard') ? COLORS.secondary : COLORS.textLight}
           />
-          <Text style={styles.navLabel}>Dashboard</Text>
+          <Text style={[styles.navLabel, { color: isActive('AdminDashboard') || isActive('CashierDashboard') ? COLORS.secondary : COLORS.textLight }]}>
+            Home
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('Product')}
-        >
+        {/* 2. PRODUK (KASIR & ADMIN BISA LIHAT) */}
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Product')}>
           <Package
-            size={24}
+            size={22}
             color={isActive('Product') ? COLORS.secondary : COLORS.textLight}
           />
-          <Text style={styles.navLabel}>Produk</Text>
+          <Text style={[styles.navLabel, { color: isActive('Product') ? COLORS.secondary : COLORS.textLight }]}>
+            Produk
+          </Text>
         </TouchableOpacity>
 
-        <View style={{ width: 75 }} />
+        {/* 3. SPACE TENGAH UNTUK FAB (DIBUAT TRANSPARAN) */}
+        <View style={styles.fabPlaceholder} />
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('Transaction')}
-        >
+        {/* 4. TRANSAKSI / RIWAYAT */}
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Transaction')}>
           <BarChart2
-            size={24}
+            size={22}
             color={isActive('Transaction') ? COLORS.secondary : COLORS.textLight}
           />
-          <Text style={styles.navLabel}>Laporan</Text>
+          <Text style={[styles.navLabel, { color: isActive('Transaction') ? COLORS.secondary : COLORS.textLight }]}>
+            {isCashierRole ? 'Riwayat' : 'Laporan'}
+          </Text>
         </TouchableOpacity>
 
+        {/* 5. PROFIL */}
         <TouchableOpacity style={styles.navItem}>
-          <User size={24} color={COLORS.textLight} />
+          <User size={22} color={COLORS.textLight} />
           <Text style={styles.navLabel}>Profil</Text>
         </TouchableOpacity>
       </View>
 
+      {/* FAB BUTTON DI TENGAH */}
       <TouchableOpacity
         style={[styles.fabButton, { bottom: 25 + insets.bottom }]}
         onPress={onFabPress}
+        activeOpacity={0.8}
       >
         <LinearGradient
-          colors={[COLORS.secondary, '#008e85']}
+          colors={isCashierRole ? ['#2196F3', '#1976D2'] : [COLORS.secondary, '#008e85']}
           style={styles.fabGradient}
         >
-          <PlusCircle size={32} color="#FFF" />
+          {isCashierRole ? (
+            <Scan size={30} color="#FFF" />
+          ) : (
+            <PlusCircle size={30} color="#FFF" />
+          )}
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -92,24 +106,42 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
   },
   navContainer: {
-    height: 70,
+    height: 75,
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    paddingHorizontal: 10,
   },
-  navItem: { alignItems: 'center', flex: 1 },
-  navLabel: { fontSize: 10, marginTop: 4 },
+  navItem: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  fabPlaceholder: { 
+    width: 70 // Memberikan ruang agar menu Produk dan Riwayat tidak bertabrakan dengan tombol tengah
+  },
+  navLabel: { 
+    fontSize: 10, 
+    marginTop: 4, 
+    fontFamily: 'PoppinsMedium' 
+  },
   fabButton: {
     position: 'absolute',
     alignSelf: 'center',
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    padding: 6,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: '#FFF',
+    padding: 4,
+    elevation: 10,
   },
   fabGradient: {
     flex: 1,
