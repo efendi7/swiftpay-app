@@ -7,10 +7,9 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
-import CashierDashboard from '../screens/Main/CashierDashboard';
 import CashierScreen from '../screens/Main/CashierScreen';
-
-import AdminTabsLayout from './AdminTabsLayout'; // ← Import AdminTabsLayout
+import AdminTabsLayout from './AdminTabsLayout';
+import CashierTabsLayout from './CashierTabsLayout'; // Import ini
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,6 +23,7 @@ const AppNavigator = () => {
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const token = await currentUser.getIdTokenResult();
+        // Fallback ke 'kasir' jika claim role tidak ada
         setRole((token.claims.role as 'admin' | 'kasir') ?? 'kasir');
         setUser(currentUser);
       } else {
@@ -32,14 +32,13 @@ const AppNavigator = () => {
       }
       setLoading(false);
     });
-
     return unsub;
   }, []);
 
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#00A79D" />
       </View>
     );
   }
@@ -56,7 +55,9 @@ const AppNavigator = () => {
           <Stack.Screen name="AdminTabs" component={AdminTabsLayout} />
         ) : (
           <>
-            <Stack.Screen name="CashierDashboard" component={CashierDashboard} />
+            {/* Jalur Kasir menggunakan Tab Layout */}
+            <Stack.Screen name="CashierTabs" component={CashierTabsLayout} />
+            {/* Screen jualan/scan tetap di Stack agar Full Screen */}
             <Stack.Screen name="Cashier" component={CashierScreen} />
           </>
         )}
@@ -66,11 +67,7 @@ const AppNavigator = () => {
 };
 
 const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 
 export default AppNavigator;
