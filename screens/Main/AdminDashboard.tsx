@@ -121,7 +121,12 @@ const AdminDashboard = () => {
           />
 
           <View style={styles.chartWrapper}>
-            <DashboardChart data={stats.weeklyData} />
+            {/* ✅ FIX: Tambahkan prop selectedPreset */}
+            <DashboardChart 
+              data={stats.weeklyData} 
+              isLoading={loading}
+              selectedPreset={selectedPreset}
+            />
           </View>
           
           <View style={styles.demoContent}>
