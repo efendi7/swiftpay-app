@@ -1,49 +1,33 @@
-// screens/Main/AdminDashboard.tsx
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  StatusBar,
-  ActivityIndicator,
-  RefreshControl,
+import React, { useRef, useCallback, useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Animated, 
+  StatusBar, 
+  ActivityIndicator, 
+  RefreshControl 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { AdminTabParamList } from '../../navigation/types';
-
 import { COLORS } from '../../constants/colors';
 import { useDashboard } from '../../hooks/useDashboard';
-
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
 import { StatsGrid } from '../../components/dashboard/StatsGrid';
 import { DashboardChart } from '../../components/dashboard/DashboardChart';
-
-type NavigationProp = BottomTabNavigationProp<AdminTabParamList, 'AdminDashboard'>;
+import { DateRangeSelector } from '../../components/dashboard/DateRangeSelector';
 
 const AdminDashboard = () => {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NavigationProp>();
-
-  const { loading, stats, refreshData } = useDashboard();
-  const scrollY = useRef(new Animated.Value(0)).current;
-  
+  const navigation = useNavigation<any>();
+  const { loading, stats, selectedPreset, refreshData, setPresetRange } = useDashboard();
   const [refreshing, setRefreshing] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const HEADER_MAX_HEIGHT = 230 + insets.top;
   const HEADER_MIN_HEIGHT = 70 + insets.top;
 
-  useEffect(() => {
-    refreshData();
-  }, [refreshData]);
-
-  useFocusEffect(
-    useCallback(() => {
-      refreshData();
-    }, [refreshData])
-  );
+  useFocusEffect(useCallback(() => { refreshData(); }, [refreshData]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -51,15 +35,25 @@ const AdminDashboard = () => {
     setRefreshing(false);
   }, [refreshData]);
 
+  const getDateLabel = () => {
+    const labels: Record<string, string> = { 
+      today: 'Hari ini', 
+      week: '7 Hari', 
+      month: '30 Hari', 
+      year: '1 Tahun' 
+    };
+    return labels[selectedPreset] || 'Hari ini';
+  };
+
   const headerHeight = scrollY.interpolate({
-    inputRange: [0, 140],
-    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    inputRange: [0, 140], 
+    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT], 
     extrapolate: 'clamp',
   });
 
   const revenueOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
+    inputRange: [0, 100], 
+    outputRange: [1, 0], 
     extrapolate: 'clamp',
   });
 
@@ -71,11 +65,11 @@ const AdminDashboard = () => {
         headerHeight={headerHeight}
         revenueOpacity={revenueOpacity}
         topPadding={insets.top + 10}
-        totalRevenue={stats.totalRevenue || 0}
-        totalExpense={stats.totalExpense || 0}
-        totalProfit={stats.totalProfit || 0}
-        lowStockCount={stats.lowStockCount || 0} // 🔔 Pass low stock count
-        onLowStockPress={() => navigation.navigate('Product')} // 🔔 Navigate ke Product
+        totalRevenue={stats.totalRevenue}
+        totalExpense={stats.totalExpense}
+        totalProfit={stats.totalProfit}
+        lowStockCount={stats.lowStockCount}
+        onLowStockPress={() => navigation.navigate('Product')}
       />
 
       <Animated.ScrollView
@@ -86,80 +80,101 @@ const AdminDashboard = () => {
           paddingHorizontal: 20,
         }}
         onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }], 
           { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            progressViewOffset={HEADER_MAX_HEIGHT} 
             colors={[COLORS.secondary]}
-            tintColor={COLORS.secondary}
-            progressViewOffset={HEADER_MAX_HEIGHT}
           />
         }
       >
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.secondary} />
-            <Text style={styles.loadingText}>Memuat data dashboard...</Text>
+        <DateRangeSelector 
+          selectedPreset={selectedPreset} 
+          onSelectPreset={setPresetRange} 
+        />
+
+        {/* Loading Indicator yang stabil di satu posisi */}
+        <View style={styles.loadingWrapper}>
+          {loading && !refreshing && (
+            <ActivityIndicator size="small" color={COLORS.secondary} />
+          )}
+        </View>
+
+        {/* Wrapper Konten: renderToHardwareTextureAndroid mencegah border kedip abu-abu */}
+        <View 
+          renderToHardwareTextureAndroid={true}
+          style={[
+            styles.contentWrapper, 
+            { opacity: loading && !refreshing ? 0.7 : 1 }
+          ]}
+        >
+          <StatsGrid
+            totalProducts={stats.totalProducts}
+            totalIn={stats.totalIn}
+            totalOut={stats.totalOut}
+            dateLabel={getDateLabel()}
+          />
+
+          <View style={styles.chartWrapper}>
+            <DashboardChart data={stats.weeklyData} />
           </View>
-        ) : (
-          <>
-            <StatsGrid
-              totalProducts={stats.totalProducts || 0}
-              inToday={stats.inToday || 0}
-              outToday={stats.outToday || 0}
-            />
+          
+          <View style={styles.demoContent}>
+            <Text style={styles.demoText}>SwiftPay Analytics Engine</Text>
+          </View>
+        </View>
 
-            <DashboardChart data={stats.weeklyData || []} />
-
-            {/* ❌ LowStockAlert DIHAPUS - Sudah di Header */}
-
-            <View style={styles.demoContent}>
-              <Text style={styles.demoText}>SwiftPay Analytics Engine</Text>
-            </View>
-
-            <Text style={styles.footerBrand}>
-              SwiftPay Ecosystem v1.0 • 2025
-            </Text>
-          </>
-        )}
+        <Text style={styles.footerBrand}>SwiftPay Ecosystem v1.0 • 2025</Text>
       </Animated.ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background 
   },
-  loadingText: {
-    marginTop: 12,
-    color: COLORS.textLight,
-    fontSize: 14,
+  loadingWrapper: { 
+    height: 30, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  contentWrapper: {
+    // Memberikan minHeight mencegah layout jumping yang bikin border kedip
+    minHeight: 400, 
+  },
+  chartWrapper: {
+    marginTop: 10,
+    minHeight: 220, // Sesuaikan dengan tinggi DashboardChart Anda
   },
   demoContent: {
-    height: 100,
-    marginTop: 10,
-    backgroundColor: '#FFF',
+    height: 100, 
+    marginTop: 20, 
+    backgroundColor: '#FFF', 
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: '#eee', 
     borderStyle: 'dashed',
   },
-  demoText: { color: COLORS.textLight, fontSize: 12 },
-  footerBrand: {
-    textAlign: 'center',
-    color: COLORS.textLight,
-    fontSize: 11,
-    marginTop: 40,
+  demoText: { 
+    color: COLORS.textLight, 
+    fontSize: 12, 
+    fontFamily: 'PoppinsRegular' 
+  },
+  footerBrand: { 
+    textAlign: 'center', 
+    color: COLORS.textLight, 
+    fontSize: 11, 
+    marginTop: 40, 
+    fontFamily: 'PoppinsRegular' 
   },
 });
 
