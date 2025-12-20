@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Image } from 'react-native';
-import { Package, AlertCircle, X, ChevronRight, Info } from 'lucide-react-native';
+import { Edit3, Package, X, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
-import { Product } from '../../types/product.types'; // Changed import
+import { Product } from '../../types/product.types';
 
 interface Props {
   item: Product;
+  onEditPress: (product: Product) => void; // Callback untuk membuka modal edit
 }
 
-const ProductCard = ({ item }: Props) => {
+const ProductCard = ({ item, onEditPress }: Props) => {
   const [modalVisible, setModalVisible] = useState(false);
   const isLowStock = item.stock < 10;
   const margin = item.price - item.purchasePrice;
@@ -66,7 +67,10 @@ const ProductCard = ({ item }: Props) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
               {/* HERO IMAGE DI MODAL */}
               <View style={styles.modalHero}>
                 {item.imageUrl ? (
@@ -108,6 +112,21 @@ const ProductCard = ({ item }: Props) => {
                 </View>
               </View>
             </ScrollView>
+            
+            {/* TOMBOL EDIT (FLOATING FIXED) */}
+            <View style={styles.floatingFooter}>
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={() => {
+                  setModalVisible(false);
+                  onEditPress(item); // Panggil callback dengan data produk
+                }}
+                activeOpacity={0.9}
+              >
+                <Edit3 size={20} color="#FFF" />
+                <Text style={styles.editButtonText}>Edit Produk</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -133,7 +152,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    // Shadow halus
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
@@ -215,7 +233,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     maxHeight: '90%',
-    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -321,6 +338,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'PoppinsSemiBold',
     color: '#1E293B',
+  },
+
+  scrollContent: {
+    paddingBottom: 120,
+  },
+  floatingFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  editButton: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 16,
+    gap: 8,
+  },
+  editButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontFamily: 'PoppinsBold',
   },
 });
 

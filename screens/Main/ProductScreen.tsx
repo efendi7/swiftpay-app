@@ -12,9 +12,9 @@ import SearchBar from '../../components/products/SearchBar';
 import FilterSection from '../../components/products/FilterSection';
 import ProductList from '../../components/products/ProductList';
 import FloatingAddButton from '../../components/products/FloatingAddButton';
+import EditProductModal from '../Main/modal/EditProductModal';
 import { Product } from '../../types/product.types';
 
-// UPDATE: Sesuaikan dengan FilterSection yang baru
 type SortType = 'newest' | 'oldest' | 'stock-high' | 'stock-low' | 'low-stock-warn' | 'safe-stock';
 type FilterMode = 'all' | 'specificMonth' | 'today';
 
@@ -24,9 +24,13 @@ const ProductScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // State untuk Edit Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
-  const [sortType, setSortType] = useState<SortType>('newest'); // Default terbaru
+  const [sortType, setSortType] = useState<SortType>('newest');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -63,6 +67,17 @@ const ProductScreen = ({ navigation }: any) => {
 
   const handleFilterModeChange = (newMode: FilterMode) => {
     setFilterMode(newMode);
+  };
+
+  // Handler untuk membuka edit modal
+  const handleEditPress = (product: Product) => {
+    setSelectedProduct(product);
+    setShowEditModal(true);
+  };
+
+  // Handler setelah edit berhasil
+  const handleEditSuccess = () => {
+    loadProducts(); // Refresh data
   };
 
   const filterProps = {
@@ -102,11 +117,23 @@ const ProductScreen = ({ navigation }: any) => {
         <ProductList 
           data={filteredProducts} 
           refreshing={refreshing} 
-          onRefresh={loadProducts} 
+          onRefresh={loadProducts}
+          onEditPress={handleEditPress}
         />
       </RoundedContentScreen>
 
       <FloatingAddButton onPress={() => navigation?.navigate('AddProduct')} />
+
+      {/* Edit Product Modal */}
+      <EditProductModal
+        visible={showEditModal}
+        product={selectedProduct}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedProduct(null);
+        }}
+        onSuccess={handleEditSuccess}
+      />
     </SafeAreaView>
   );
 };

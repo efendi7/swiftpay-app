@@ -9,21 +9,30 @@ interface Props {
   data: Product[];
   refreshing: boolean;
   onRefresh: () => void;
+  onEditPress?: (product: Product) => void;
 }
 
-const ProductList = ({ data, refreshing, onRefresh }: Props) => {
+const ProductList = ({ data, refreshing, onRefresh, onEditPress }: Props) => {
   const insets = useSafeAreaInsets();
 
   return (
     <FlatList<Product>
       data={data}
-      renderItem={({ item }) => <ProductCard item={item} />}
+      renderItem={({ item }) => {
+        // Hanya pass onEditPress jika ada
+        const cardProps: any = { item };
+        if (onEditPress) {
+          cardProps.onEditPress = onEditPress;
+        }
+        
+        return <ProductCard {...cardProps} />;
+      }}
       keyExtractor={item => item.id}
       contentContainerStyle={[
         styles.contentContainer,
         {
-          paddingBottom: insets.bottom + 100, // ruang untuk bottom tab + FAB
-          paddingTop: 20,     // ← Tambah jarak atas dari FilterSection
+          paddingBottom: insets.bottom + 100,
+          paddingTop: 20,
         },
       ]}
       refreshing={refreshing}
@@ -39,13 +48,13 @@ const ProductList = ({ data, refreshing, onRefresh }: Props) => {
 
 const styles = StyleSheet.create({
   contentContainer: {
-    paddingHorizontal: 16,     // ganti padding: 16 jadi hanya horizontal
+    paddingHorizontal: 16,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 300,           // agar empty state terlihat bagus
+    minHeight: 300,
   },
   empty: {
     textAlign: 'center',

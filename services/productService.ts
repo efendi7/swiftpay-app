@@ -5,7 +5,8 @@ import {
   getDocs, 
   serverTimestamp, 
   writeBatch, 
-  doc 
+  doc,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { ProductFormData, ProductValidationResult } from '../models/Product';
@@ -167,6 +168,54 @@ export class ProductService {
     } catch (error) {
       console.error("Firestore Error:", error);
       throw new Error('Gagal menyimpan ke database');
+    }
+  }
+
+  /**
+   * Update Product
+   */
+  static async updateProduct(productId: string, data: ProductFormData, oldStock: number): Promise<void> {
+    const validation = this.validateProduct(data);
+    if (!validation.isValid) throw new Error(validation.error);
+
+    try {
+      const batch = writeBatch(db);
+      const productRef = doc(db, 'products', productId);
+      
+      const newStock = parseInt(data.stock);
+      
+      const productData = {
+        name: data.name.trim(),
+        price: parseFloat(data.price),
+        purchasePrice: parseFloat(data.purchasePrice),
+        supplier: data.supplier?.trim() || 'Umum',
+        category: data.category?.trim() || 'Tanpa Kategori',
+        stock: newStock,
+        barcode: data.barcode.trim(),
+        imageUrl: data.imageUrl, 
+        updatedAt: serverTimestamp(),
+      };
+      
+      batch.update(productRef, productData);
+
+      // Jika ada perubahan stok, catat di riwayat (stock_adjustments)
+      if (newStock !== oldStock) {
+        const adjustmentRef = doc(collection(db, 'stock_adjustments'));
+        batch.set(adjustmentRef, {
+          productId: productId,
+          productName: data.name.trim(),
+          oldStock: oldStock,
+          newStock: newStock,
+          difference: newStock - oldStock,
+          date: serverTimestamp(),
+          reason: 'Manual Edit',
+        });
+      }
+
+      await batch.commit();
+    } catch (error) {
+      console.error("Firestore Update Error:", error);
+      throw new Error('Gagal memperbarui produk');
     }
   }
 }
