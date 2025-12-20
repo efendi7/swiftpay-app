@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { SafeAreaView, StatusBar, View, ActivityIndicator, Text } from 'react-native';
+import { SafeAreaView, StatusBar, View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore'; // Tambah doc & getDoc
-import { auth, db } from '../../services/firebaseConfig'; // Pastikan auth diimport
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../../services/firebaseConfig';
 import { COLORS } from '../../constants/colors';
+// Import ikon Package
+import { Package } from 'lucide-react-native'; 
 
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { RoundedContentScreen } from '../../components/common/RoundedContentScreen';
-
 import SearchBar from '../../components/products/SearchBar';
 import FilterSection from '../../components/products/FilterSection';
 import ProductList from '../../components/products/ProductList';
@@ -23,11 +23,8 @@ const ProductScreen = ({ navigation }: any) => {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [userRole, setUserRole] = useState<'admin' | 'kasir'>('kasir');
 
-  // ✅ PERBAIKAN: State role sekarang dinamis
-  const [userRole, setUserRole] = useState<'admin' | 'kasir'>('kasir'); // Default ke kasir untuk keamanan
-
-  // State untuk Edit Modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -37,19 +34,15 @@ const ProductScreen = ({ navigation }: any) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // ✅ FUNGSI BARU: Ambil Role dari Firestore
   const fetchUserRole = useCallback(async () => {
     try {
       const currentUser = auth.currentUser;
       if (currentUser) {
-        // Ambil dokumen user berdasarkan UID dari koleksi 'users'
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDoc = await getDoc(userDocRef);
-        
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          setUserRole(userData.role); // Set role sesuai data di Firestore ("admin" atau "kasir")
-          console.log("Current User Role:", userData.role);
+          setUserRole(userData.role);
         }
       }
     } catch (error) {
@@ -74,7 +67,6 @@ const ProductScreen = ({ navigation }: any) => {
     }
   }, []);
 
-  // ✅ Ambil role dan data produk saat komponen dimuat
   useEffect(() => {
     fetchUserRole();
     loadProducts();
@@ -87,21 +79,9 @@ const ProductScreen = ({ navigation }: any) => {
     }, [fetchUserRole, loadProducts])
   );
 
-  const handleSortChange = (newSort: SortType) => {
-    setSortType(newSort);
-  };
-
-  const handleFilterModeChange = (newMode: FilterMode) => {
-    setFilterMode(newMode);
-  };
-
   const handleEditPress = (product: Product) => {
     setSelectedProduct(product);
     setShowEditModal(true);
-  };
-
-  const handleEditSuccess = () => {
-    loadProducts();
   };
 
   const filterProps = {
@@ -112,31 +92,37 @@ const ProductScreen = ({ navigation }: any) => {
     selectedMonth,
     selectedYear,
     onFiltered: setFilteredProducts,
-    onFilterModeChange: handleFilterModeChange,
-    onSortChange: handleSortChange,
+    onFilterModeChange: (newMode: FilterMode) => setFilterMode(newMode),
+    onSortChange: (newSort: SortType) => setSortType(newSort),
     onMonthChange: setSelectedMonth,
     onYearChange: setSelectedYear,
   };
 
   if (loading && products.length === 0) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
+      <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={COLORS.secondary} />
-        <Text style={{ marginTop: 10, color: COLORS.textLight, fontFamily: 'PoppinsRegular' }}>Memuat produk...</Text>
+        <Text style={styles.loaderText}>Memuat produk...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
-      <ScreenHeader title="Daftar Produk" subtitle="Manajemen Stok & Harga" />
+      {/* Tambahkan ikon Package di sini */}
+      <ScreenHeader 
+        title="Daftar Produk" 
+        subtitle="Manajemen Stok & Harga" 
+        icon={<Package size={24} color="#FFFF"  />}
+      />
 
-      <RoundedContentScreen>
-        <SearchBar value={searchQuery} onChange={setSearchQuery} />
-        
-        <FilterSection {...filterProps} />
+      <View style={styles.contentWrapper}>
+        <View style={styles.filterSearchContainer}>
+          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <FilterSection {...filterProps} />
+        </View>
         
         <ProductList 
           data={filteredProducts} 
@@ -144,9 +130,8 @@ const ProductScreen = ({ navigation }: any) => {
           onRefresh={loadProducts}
           onEditPress={handleEditPress}
         />
-      </RoundedContentScreen>
+      </View>
 
-      {/* ✅ Tombol Tambah hanya muncul untuk admin */}
       {userRole === 'admin' && (
         <FloatingAddButton onPress={() => navigation?.navigate('AddProduct')} />
       )}
@@ -154,15 +139,47 @@ const ProductScreen = ({ navigation }: any) => {
       <EditProductModal
         visible={showEditModal}
         product={selectedProduct}
-        userRole={userRole} // ✅ Role dikirim secara dinamis
+        userRole={userRole}
         onClose={() => {
           setShowEditModal(false);
           setSelectedProduct(null);
         }}
-        onSuccess={handleEditSuccess}
+        onSuccess={loadProducts}
       />
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.primary 
+  },
+  loaderContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: '#F8FAFC' 
+  },
+  loaderText: { 
+    marginTop: 10, 
+    color: COLORS.textLight, 
+    fontFamily: 'PoppinsRegular' 
+  },
+  contentWrapper: { 
+    flex: 1, 
+    backgroundColor: '#F8FAFC', 
+    borderTopLeftRadius: 30, 
+    borderTopRightRadius: 30, 
+    marginTop: -20, 
+    overflow: 'hidden' 
+  },
+  filterSearchContainer: { 
+    paddingTop: 24, 
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 16, 
+  }
+});
 
 export default ProductScreen;

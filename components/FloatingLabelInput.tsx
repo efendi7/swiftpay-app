@@ -9,7 +9,7 @@ import {
   Platform,
   Easing,
   TouchableOpacity,
-  LayoutChangeEvent,
+  ScrollView,
 } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
 
@@ -18,7 +18,9 @@ const COLORS = {
   borderNormal: '#bdc3c7',
   labelNormal: '#7f8c8d',
   text: '#34495e',
+  textDisabled: '#94A3B8',
   background: '#FFFFFF',
+  backgroundDisabled: '#F8FAFC',
 };
 
 interface FloatingLabelInputProps extends TextInputProps {
@@ -41,6 +43,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
   inputStyle,
   labelStyle,
   onFocusCallback,
+  editable = true,
   ...rest
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -73,10 +76,12 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
     outputRange: [icon ? 30 : 0, icon ? -4 : 0],
   });
 
-  const labelColor = isFocused ? COLORS.primary : COLORS.labelNormal;
+  const labelColor = isFocused ? COLORS.primary : (editable ? COLORS.labelNormal : COLORS.textDisabled);
   const borderColor = isFocused ? COLORS.primary : COLORS.borderNormal;
+  const backgroundColor = editable ? COLORS.background : COLORS.backgroundDisabled;
 
   const handleFocus = () => {
+    if (!editable) return;
     setIsFocused(true);
     if (onFocusCallback && containerRef.current) {
       containerRef.current.measure((x, y, width, height, pageX, pageY) => {
@@ -86,7 +91,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
   };
 
   return (
-    <View ref={containerRef} style={[styles.container, { borderColor }]}>
+    <View ref={containerRef} style={[styles.container, { borderColor, backgroundColor }]}>
       <Animated.Text
         numberOfLines={1}
         ellipsizeMode="tail"
@@ -95,7 +100,8 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
           {
             transform: [{ translateY }, { translateX }, { scale }],
             color: labelColor,
-            maxWidth: '90%', 
+            maxWidth: '90%',
+            backgroundColor,
           },
           labelStyle,
         ]}
@@ -106,19 +112,35 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
       <View style={styles.inputRow}>
         {icon && <View style={styles.iconContainer}>{icon}</View>}
 
-        <TextInput
-          {...rest}
-          value={value}
-          onChangeText={onChangeText}
-          style={[styles.input, inputStyle]}
-          secureTextEntry={secure}
-          cursorColor={COLORS.primary}
-          onFocus={handleFocus}
-          onBlur={() => setIsFocused(false)}
-          placeholder=""
-        />
+        {!editable && value ? (
+          // Read-only dengan ScrollView horizontal
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.scrollViewContainer}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            <Text style={[styles.readOnlyText, inputStyle]}>
+              {value}
+            </Text>
+          </ScrollView>
+        ) : (
+          // Editable TextInput
+          <TextInput
+            {...rest}
+            value={value}
+            onChangeText={onChangeText}
+            style={[styles.input, inputStyle, !editable && styles.inputDisabled]}
+            secureTextEntry={secure}
+            cursorColor={COLORS.primary}
+            onFocus={handleFocus}
+            onBlur={() => setIsFocused(false)}
+            placeholder=""
+            editable={editable}
+          />
+        )}
 
-        {isPassword && (
+        {isPassword && editable && (
           <TouchableOpacity
             onPress={() => setSecure(!secure)}
             style={styles.eyeIcon}
@@ -180,6 +202,29 @@ const styles = StyleSheet.create({
       },
       ios: {
         paddingVertical: 6,
+      }
+    }),
+  },
+  inputDisabled: {
+    color: COLORS.textDisabled,
+  },
+  scrollViewContainer: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    alignItems: 'center',
+    paddingRight: 10, // Extra padding untuk scroll
+  },
+  readOnlyText: {
+    fontSize: 13,
+    color: COLORS.textDisabled,
+    fontFamily: 'PoppinsRegular',
+    ...Platform.select({
+      android: {
+        textAlignVertical: 'center',
+      },
+      ios: {
+        lineHeight: 18,
       }
     }),
   },

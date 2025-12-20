@@ -1,51 +1,71 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Package, ChevronRight } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Edit2, Package, AlertTriangle } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
 import { Product } from '../../types/product.types';
 
-interface Props {
-  item: Product;
-  onEditPress: (product: Product) => void; 
+interface ProductCardProps {
+  product: Product;
+  onEditPress: (product: Product) => void;
 }
 
-const ProductCard = ({ item, onEditPress }: Props) => {
-  const isLowStock = item.stock < 10;
+const ProductCard: React.FC<ProductCardProps> = ({ product, onEditPress }) => {
+  // Logika stok rendah (misal: di bawah 10 unit)
+  const isLowStock = product.stock < 10;
 
   return (
     <TouchableOpacity 
       style={styles.card}
-      // SEKARANG: Langsung panggil onEditPress (yang akan membuka EditProductModal sebagai detail)
-      onPress={() => onEditPress(item)} 
+      onPress={() => onEditPress(product)}
       activeOpacity={0.8}
     >
-      {/* GAMBAR PRODUK */}
+      {/* 1. IMAGE CONTAINER (SISI KIRI) */}
       <View style={styles.imageContainer}>
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
+        {product.imageUrl ? (
+          <Image source={{ uri: product.imageUrl }} style={styles.productImage} />
         ) : (
-          <View style={[styles.placeholderImage, { backgroundColor: isLowStock ? '#FFF5F5' : '#F0F9FF' }]}>
-            <Package size={24} color={isLowStock ? COLORS.danger : COLORS.primary} />
+          <View style={styles.imagePlaceholder}>
+            <Package size={24} color="#CBD5E1" />
           </View>
         )}
       </View>
-      
+
+      {/* 2. CONTENT AREA */}
       <View style={styles.content}>
-        <Text style={styles.categoryText}>{item.category || 'Tanpa Kategori'}</Text>
-        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
         
-        <View style={styles.footerRow}>
-          <Text style={styles.priceText}>Rp {item.price.toLocaleString('id-ID')}</Text>
-          <View style={[styles.stockBadgeSmall, { backgroundColor: isLowStock ? '#FFF5F5' : '#F0FDF4' }]}>
-            <View style={[styles.dot, { backgroundColor: isLowStock ? COLORS.danger : COLORS.success }]} />
-            <Text style={[styles.stockValue, { color: isLowStock ? COLORS.danger : COLORS.success }]}>
-              {item.stock} stok
-            </Text>
+        {/* ROW ATAS: NAMA & BADGE STOK RENDAH */}
+        <View style={styles.headerRow}>
+          <Text style={styles.productName} numberOfLines={1}>
+            {product.name}
+          </Text>
+          
+          {isLowStock && (
+            <View style={styles.lowStockBadge}>
+              <AlertTriangle size={10} color="#EF4444" />
+              <Text style={styles.lowStockText}>Stok Rendah</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ROW TENGAH: BARCODE & INFO UNIT */}
+        <View style={styles.infoRow}>
+          <Text style={styles.barcodeText} numberOfLines={1}>
+            {product.barcode}
+          </Text>
+          <View style={styles.stockBadge}>
+            <Package size={12} color="#64748B" />
+            <Text style={styles.stockText}>{product.stock} stok</Text>
           </View>
         </View>
-      </View>
 
-      <ChevronRight size={18} color="#CBD5E1" />
+        {/* ROW BAWAH: HARGA & ICON EDIT */}
+        <View style={styles.footerRow}>
+          <Text style={styles.priceText}>
+            Rp {product.price.toLocaleString('id-ID')}
+          </Text>
+          <Edit2 size={16} color="#CBD5E1" />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -56,78 +76,97 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 20,
     marginBottom: 12,
-    flexDirection: 'row',
+    flexDirection: 'row', // Membuat Gambar dan Konten berjejer ke samping
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
   },
   imageContainer: {
-    width: 64,
-    height: 64,
+    width: 70,
+    height: 70,
     borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    marginRight: 12,
     overflow: 'hidden',
-    marginRight: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   productImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
-  placeholderImage: {
-    width: '100%',
-    height: '100%',
+  imagePlaceholder: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
   },
-  categoryText: {
-    fontSize: 10,
-    fontFamily: 'PoppinsSemiBold',
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  name: {
-    fontSize: 15,
-    fontFamily: 'PoppinsBold',
-    color: '#1E293B',
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // Memaksa Badge Stok Rendah ke kanan
+    alignItems: 'center',
     marginBottom: 4,
+  },
+  productName: {
+    fontSize: 15,
+    fontFamily: 'PoppinsSemiBold',
+    color: '#1E293B',
+    flex: 1, // Mengambil ruang sisa agar badge tetap di ujung kanan
+    marginRight: 8,
+  },
+  lowStockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  lowStockText: {
+    fontSize: 8,
+    fontFamily: 'PoppinsBold',
+    color: '#EF4444',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  barcodeText: {
+    fontSize: 11,
+    fontFamily: 'PoppinsMedium',
+    color: '#64748B',
+    flex: 1,
+  },
+  stockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  stockText: {
+    fontSize: 11,
+    fontFamily: 'PoppinsSemiBold',
+    color: '#64748B',
   },
   footerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingRight: 10,
+    alignItems: 'center',
+    marginTop: 2,
   },
   priceText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'PoppinsBold',
-    color: COLORS.secondary,
-  },
-  stockBadgeSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
-  stockValue: {
-    fontSize: 11,
-    fontFamily: 'PoppinsSemiBold',
+    color: '#000',
   },
 });
 

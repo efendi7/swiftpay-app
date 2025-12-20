@@ -19,11 +19,12 @@ const ProductList = ({ data, refreshing, onRefresh, onEditPress }: Props) => {
       data={data}
       renderItem={({ item }) => (
         <ProductCard 
-          item={item} 
+          product={item} 
           onEditPress={onEditPress} 
         />
       )}
       keyExtractor={item => item.id}
+      showsVerticalScrollIndicator={false}
       contentContainerStyle={[
         styles.contentContainer,
         {
