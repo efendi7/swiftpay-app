@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { LineChart } from "react-native-gifted-charts";
 import { COLORS } from '../../constants/colors';
 import { TrendingUp } from 'lucide-react-native';
@@ -8,55 +8,42 @@ const { width } = Dimensions.get('window');
 
 interface DashboardChartProps {
   data?: any[];
+  isLoading?: boolean; // Tambahkan ini
 }
 
-export const DashboardChart: React.FC<DashboardChartProps> = ({ data }) => {
-  // Urutan: Senin -> Minggu
+export const DashboardChart: React.FC<DashboardChartProps> = ({ data, isLoading }) => {
   const defaultData = [
-    { value: 0, label: 'Sen' }, 
-    { value: 0, label: 'Sel' }, 
-    { value: 0, label: 'Rab' },
-    { value: 0, label: 'Kam' }, 
-    { value: 0, label: 'Jum' }, 
-    { value: 0, label: 'Sab' },
+    { value: 0, label: 'Sen' }, { value: 0, label: 'Sel' }, 
+    { value: 0, label: 'Rab' }, { value: 0, label: 'Kam' }, 
+    { value: 0, label: 'Jum' }, { value: 0, label: 'Sab' }, 
     { value: 0, label: 'Min' }
   ];
 
   const chartData = data && data.length > 0 ? data : defaultData;
-
-  // Hitung total dan rata-rata untuk info tambahan
   const totalValue = chartData.reduce((sum, item) => sum + item.value, 0);
-  const avgValue = totalValue / chartData.length;
   const maxValue = Math.max(...chartData.map(item => item.value));
-  
-  // Cek apakah semua nilai adalah 0
+  const avgValue = totalValue / 7;
   const hasValidData = totalValue > 0;
 
-  // Hitung rentang minggu ini (Senin - Minggu)
   const getWeekRange = () => {
     const today = new Date();
     const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Senin minggu ini
-    
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(today.setDate(diff));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    
-    const formatDate = (date: Date) => {
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    };
-    
+    const formatDate = (date: Date) => `${date.getDate()}/${date.getMonth() + 1}`;
     return `${formatDate(monday)} - ${formatDate(sunday)}`;
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { opacity: isLoading ? 0.7 : 1 }]}>
       <View style={styles.header}>
         <View style={styles.iconBox}>
           <TrendingUp size={18} color={COLORS.primary} />
         </View>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Tren Penjualan Minggu Ini</Text>
+          <Text style={styles.title}>Tren Penjualan</Text>
           <Text style={styles.subtitle}>
             Total: Rp {totalValue.toLocaleString('id-ID')}
           </Text>
@@ -64,106 +51,70 @@ export const DashboardChart: React.FC<DashboardChartProps> = ({ data }) => {
       </View>
 
       <View style={styles.chartWrapper}>
-        {hasValidData ? (
-          <LineChart
-            areaChart
-            curved
-            data={chartData}
-            width={width - 100}
-            height={180}
-            hideDataPoints={false}
-            dataPointsColor={COLORS.primary}
-            dataPointsRadius={4}
-            dataPointsHeight={8}
-            dataPointsWidth={8}
-            spacing={(width - 100) / (chartData.length + 1)}
-            color={COLORS.primary}
-            thickness={3}
-            startFillColor="rgba(20, 158, 136, 0.4)"
-            endFillColor="rgba(20, 158, 136, 0.05)"
-            startOpacity={0.9}
-            endOpacity={0.2}
-            initialSpacing={20}
-            endSpacing={20}
-            noOfSections={4}
-            maxValue={maxValue > 0 ? maxValue * 1.2 : 100}
-            yAxisThickness={0}
-            xAxisThickness={1}
-            xAxisColor="#E5E7EB"
-            rulesType="solid"
-            rulesColor="#F3F4F6"
-            rulesThickness={1}
-            hideYAxisText
-            showVerticalLines={false}
-            disableScroll
-            animateOnDataChange
-            animationDuration={800}
-            onDataChangeAnimationDuration={300}
-            pointerConfig={{
-              pointerStripHeight: 180,
-              pointerStripColor: COLORS.primary,
-              pointerStripWidth: 2,
-              strokeDashArray: [4, 4],
-              pointerColor: COLORS.primary,
-              radius: 6,
-              pointerLabelWidth: 140,
-              pointerLabelHeight: 90,
-              activatePointersOnLongPress: false,
-              autoAdjustPointerLabelPosition: true,
-              pointerLabelComponent: (items: any) => {
-                const item = items[0];
-                return (
-                  <View style={styles.tooltipContainer}>
-                    <View style={styles.tooltip}>
-                      <Text style={styles.tooltipDay}>{item.label}</Text>
-                      <Text style={styles.tooltipValue}>
-                        Rp {item.value.toLocaleString('id-ID')}
-                      </Text>
-                      {item.value > 0 && (
-                        <Text style={styles.tooltipPercent}>
-                          {((item.value / maxValue) * 100).toFixed(0)}% dari max
+        {/* Gunakan minHeight agar layout tidak goyang saat transisi data */}
+        <View style={{ height: 200, width: '100%', justifyContent: 'center' }}>
+          {hasValidData ? (
+            <LineChart
+              areaChart
+              curved
+              data={chartData}
+              width={width - 100}
+              height={180}
+              hideDataPoints={false}
+              dataPointsColor={COLORS.primary}
+              spacing={(width - 100) / 7}
+              color={COLORS.primary}
+              thickness={3}
+              startFillColor="rgba(20, 158, 136, 0.3)"
+              endFillColor="rgba(20, 158, 136, 0.01)"
+              maxValue={maxValue > 0 ? maxValue * 1.2 : 100}
+              yAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor="#E5E7EB"
+              hideYAxisText
+              disableScroll
+              // Animasi dimatikan sedikit agar tidak terasa berat saat ganti filter cepat
+              animateOnDataChange={true} 
+              animationDuration={500}
+              pointerConfig={{
+                pointerStripHeight: 180,
+                pointerStripColor: COLORS.primary,
+                pointerStripWidth: 2,
+                strokeDashArray: [4, 4],
+                pointerLabelComponent: (items: any) => {
+                  const item = items[0];
+                  return (
+                    <View style={styles.tooltipContainer}>
+                      <View style={styles.tooltip}>
+                        <Text style={styles.tooltipDay}>{item.label}</Text>
+                        <Text style={styles.tooltipValue}>
+                          Rp {item.value.toLocaleString('id-ID')}
                         </Text>
-                      )}
+                      </View>
+                      <View style={styles.tooltipArrow} />
                     </View>
-                    <View style={styles.tooltipArrow} />
-                  </View>
-                );
-              },
-            }}
-            xAxisLabelTextStyle={styles.xAxisText}
-          />
-        ) : (
-          <View style={styles.emptyChart}>
-            <Text style={styles.emptyChartText}>Belum ada data penjualan minggu ini</Text>
-            <Text style={styles.emptyChartSubtext}>Mulai transaksi untuk melihat grafik</Text>
-          </View>
-        )}
+                  );
+                },
+              }}
+              xAxisLabelTextStyle={styles.xAxisText}
+            />
+          ) : (
+            <View style={styles.emptyChart}>
+              {isLoading ? (
+                 <ActivityIndicator color={COLORS.primary} />
+              ) : (
+                <>
+                  <Text style={styles.emptyChartText}>Tidak ada data</Text>
+                  <Text style={styles.emptyChartSubtext}>Periode ini belum memiliki transaksi</Text>
+                </>
+              )}
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Stats Row */}
-      {totalValue > 0 && (
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Rata-rata</Text>
-            <Text style={styles.statValue}>
-              Rp {Math.round(avgValue).toLocaleString('id-ID')}
-            </Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Tertinggi</Text>
-            <Text style={styles.statValue}>
-              Rp {maxValue.toLocaleString('id-ID')}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Week Range Info */}
       <View style={styles.weekRangeContainer}>
-        <Text style={styles.weekRangeText}>
-          Periode: {getWeekRange()}
-        </Text>
+        <Text style={styles.weekRangeText}>Periode: {getWeekRange()}</Text>
       </View>
     </View>
   );
