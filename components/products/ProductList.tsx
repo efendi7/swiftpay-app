@@ -1,4 +1,3 @@
-// components/products/ProductList.tsx
 import React from 'react';
 import { FlatList, Text, StyleSheet, View } from 'react-native';
 import ProductCard from './ProductCard';
@@ -9,7 +8,7 @@ interface Props {
   data: Product[];
   refreshing: boolean;
   onRefresh: () => void;
-  onEditPress?: (product: Product) => void;
+  onEditPress: (product: Product) => void; // Hilangkan tanda tanya (?) karena sekarang wajib
 }
 
 const ProductList = ({ data, refreshing, onRefresh, onEditPress }: Props) => {
@@ -18,15 +17,12 @@ const ProductList = ({ data, refreshing, onRefresh, onEditPress }: Props) => {
   return (
     <FlatList<Product>
       data={data}
-      renderItem={({ item }) => {
-        // Hanya pass onEditPress jika ada
-        const cardProps: any = { item };
-        if (onEditPress) {
-          cardProps.onEditPress = onEditPress;
-        }
-        
-        return <ProductCard {...cardProps} />;
-      }}
+      renderItem={({ item }) => (
+        <ProductCard 
+          item={item} 
+          onEditPress={onEditPress} 
+        />
+      )}
       keyExtractor={item => item.id}
       contentContainerStyle={[
         styles.contentContainer,

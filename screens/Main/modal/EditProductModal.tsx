@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, StatusBar, Modal, Animated,
+  View, Text, StyleSheet, ScrollView, StatusBar, Modal,
   TouchableWithoutFeedback, Dimensions, KeyboardAvoidingView, Platform, Alert,
   TouchableOpacity, ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Save } from 'lucide-react-native';
+import { X, Save, Edit3, Lock } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../../../constants/colors';
@@ -15,46 +15,29 @@ import BarcodeScannerScreen from '../BarcodeScannerScreen';
 import { Product } from '../../../types/product.types';
 
 const { height } = Dimensions.get('window');
-const MAX_MODAL_HEIGHT = height * 0.85;
+const MAX_MODAL_HEIGHT = height * 0.9;
 
 interface EditProductModalProps {
   visible: boolean;
   product: Product | null;
   onClose: () => void;
   onSuccess?: () => void;
+  userRole: 'admin' | 'kasir'; 
 }
 
 const EditProductModal: React.FC<EditProductModalProps> = ({ 
   visible, 
   product, 
   onClose, 
-  onSuccess 
+  onSuccess,
+  userRole
 }) => {
-  const slideAnim = useRef(new Animated.Value(height)).current;
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
-
-  const animateModal = useCallback((toValue: number, callback?: () => void) => {
-    if (toValue === 0) {
-      Animated.spring(slideAnim, {
-        toValue,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 90,
-      }).start(callback);
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: height,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(callback);
-    }
-  }, [slideAnim]);
-
-  useEffect(() => {
-    if (visible) animateModal(0);
-    else slideAnim.setValue(height);
-  }, [visible, animateModal, slideAnim]);
+  const [isEditable, setIsEditable] = useState(false);
+  
+  // Ref untuk mencegah loop (perbaikan error gambar 1)
+  const loadedProductId = useRef<string | null>(null);
 
   const {
     formData, loading, showScanner, imageUri,
@@ -63,11 +46,11 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
   } = useProductForm(() => {
     if (onSuccess) onSuccess();
     handleClose();
-  }, product?.id); // Pass productId untuk mode edit
+  }, product?.id);
 
-  // Set data awal saat product berubah
+  // Effect untuk sinkronisasi data (fix infinite loop)
   useEffect(() => {
-    if (product && visible) {
+    if (visible && product && product.id !== loadedProductId.current) {
       setInitialData({
         name: product.name,
         price: product.price.toString(),
@@ -78,15 +61,20 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
         category: product.category || '',
         imageUrl: product.imageUrl || ''
       }, product.imageUrl || null);
+      
+      loadedProductId.current = product.id;
     }
-  }, [product, visible]);
 
-  const handleClose = useCallback(() => {
-    animateModal(height, () => {
-      resetForm();
-      onClose();
-    });
-  }, [onClose, animateModal, resetForm]);
+    if (!visible) {
+      loadedProductId.current = null;
+      setIsEditable(false);
+    }
+  }, [product, visible, setInitialData]);
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const onAutoGeneratePress = () => {
     Alert.alert(
@@ -94,11 +82,11 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
       "Pilih standar barcode yang diinginkan:",
       [
         { 
-          text: "EAN-13 (Ritel Standar)", 
+          text: "EAN-13", 
           onPress: () => updateField('barcode', Date.now().toString().substring(0, 13))
         },
         { 
-          text: "CODE-128 (Internal Toko)", 
+          text: "CODE-128", 
           onPress: () => updateField('barcode', Date.now().toString().substring(0, 15))
         },
         { text: "Batal", style: "cancel" }
@@ -107,7 +95,12 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
   };
 
   return (
-    <Modal transparent visible={visible} animationType="none">
+    <Modal 
+      transparent 
+      visible={visible} 
+      animationType="slide" // Meniru kecepatan modal transaksi
+      onRequestClose={handleClose}
+    >
       <StatusBar translucent backgroundColor="rgba(0,0,0,0.5)" barStyle="light-content" />
       <View style={styles.overlay}>
         <TouchableWithoutFeedback onPress={handleClose}>
@@ -118,29 +111,22 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
         >
-          <Animated.View
+          <View
             style={[
               styles.modalContainer,
-              { maxHeight: MAX_MODAL_HEIGHT, transform: [{ translateY: slideAnim }] },
+              { maxHeight: MAX_MODAL_HEIGHT },
             ]}
           >
-            {/* CUSTOM HEADER UNTUK EDIT */}
             <LinearGradient
-              colors={[COLORS.primary, '#2c537a']}
+              colors={isEditable ? [COLORS.primary, '#2c537a'] : ['#475569', '#1e293b']}
               style={[styles.header, { paddingTop: insets.top + 12 }]}
             >
-              <View style={styles.dragHandleContainer}>
-                <View style={styles.dragHandle} />
-              </View>
-
+              <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
               <View style={styles.headerContent}>
                 <View style={styles.headerTitleContainer}>
-                  <Text style={styles.headerSubtitle}>Manajemen Produk</Text>
-                  <Text style={styles.headerTitle}>
-                    {product ? "Edit Produk" : "Tambah Produk"}
-                  </Text>
+                  <Text style={styles.headerSubtitle}>{isEditable ? "Mode Edit" : "Informasi"}</Text>
+                  <Text style={styles.headerTitle}>{isEditable ? "Edit Produk" : "Detail Produk"}</Text>
                 </View>
-
                 <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                   <X size={24} color="#FFF" />
                 </TouchableOpacity>
@@ -155,6 +141,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
                 keyboardShouldPersistTaps="handled"
               >
                 <ProductFormFields
+                  isEditable={isEditable}
                   name={formData.name}
                   price={formData.price}
                   purchasePrice={formData.purchasePrice}
@@ -179,47 +166,37 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
                   }}
                 />
 
-                {/* CUSTOM SUBMIT BUTTON */}
-                <TouchableOpacity
-                  style={[styles.saveButton, loading && { opacity: 0.8 }]}
-                  onPress={handleSubmit}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={[COLORS.secondary, '#008e85']}
-                    style={styles.saveGradient}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#FFF" />
+                <View style={styles.footerActions}>
+                  {!isEditable ? (
+                    userRole === 'admin' ? (
+                      <TouchableOpacity style={styles.editModeButton} onPress={() => setIsEditable(true)}>
+                        <Edit3 size={20} color="#FFF" /><Text style={styles.buttonText}>Edit Produk</Text>
+                      </TouchableOpacity>
                     ) : (
-                      <>
-                        <Save size={20} color="#FFF" style={{ marginRight: 10 }} />
-                        <Text style={styles.saveButtonText}>
-                          {product ? "Simpan Perubahan" : "Simpan Produk Baru"}
-                        </Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <Text style={styles.infoFooter}>
-                  {product 
-                    ? "Pastikan data sudah benar sebelum menyimpan perubahan." 
-                    : "Gunakan EAN-13 untuk produk umum agar kompatibel dengan sistem lain."
-                  }
-                </Text>
+                      <View style={styles.readOnlyBadge}>
+                        <Lock size={16} color={COLORS.textLight} /><Text style={styles.readOnlyText}>Akses Terbatas (Kasir)</Text>
+                      </View>
+                    )
+                  ) : (
+                    <TouchableOpacity style={[styles.saveButton, loading && { opacity: 0.8 }]} onPress={handleSubmit} disabled={loading}>
+                      <LinearGradient colors={[COLORS.secondary, '#008e85']} style={styles.saveGradient}>
+                        {loading ? <ActivityIndicator color="#FFF" /> : <><Save size={20} color="#FFF" style={{ marginRight: 10 }} /><Text style={styles.buttonText}>Simpan</Text></>}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                  {isEditable && (
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => setIsEditable(false)}>
+                      <Text style={styles.cancelButtonText}>Batal</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </ScrollView>
             </View>
 
             {showScanner && (
-              <BarcodeScannerScreen
-                visible={showScanner}
-                onClose={() => setShowScanner(false)}
-                onScan={handleBarcodeScanned}
-              />
+              <BarcodeScannerScreen visible={showScanner} onClose={() => setShowScanner(false)} onScan={handleBarcodeScanned} />
             )}
-          </Animated.View>
+          </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -227,113 +204,29 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  keyboardView: {
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: COLORS.primary,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    overflow: 'hidden',
-  },
-  contentWrapper: {
-    backgroundColor: COLORS.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -16,
-    flexShrink: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-  },
-  
-  // Header styles
-  header: {
-    paddingBottom: 36,
-    paddingHorizontal: 20,
-  },
-  dragHandleContainer: {
-    position: 'absolute',
-    top: 8,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  dragHandle: {
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  headerTitleContainer: {
-    flex: 1,
-  },
-  headerSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontFamily: 'PoppinsMedium',
-  },
-  headerTitle: {
-    color: '#FFF',
-    fontSize: 22,
-    fontFamily: 'MontserratBold',
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  // Submit button styles
-  saveButton: {
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  saveGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-  },
-  saveButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontFamily: 'PoppinsSemiBold',
-  },
-  
-  infoFooter: {
-    textAlign: 'center',
-    fontSize: 11,
-    fontFamily: 'PoppinsRegular',
-    color: COLORS.textLight,
-    marginTop: 16,
-    paddingHorizontal: 20,
-    lineHeight: 16,
-    marginBottom: 8,
-  },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  keyboardView: { justifyContent: 'flex-end' },
+  modalContainer: { backgroundColor: COLORS.primary, borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
+  contentWrapper: { backgroundColor: COLORS.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -16, flexShrink: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  header: { paddingBottom: 36, paddingHorizontal: 20 },
+  dragHandleContainer: { position: 'absolute', top: 8, left: 0, right: 0, alignItems: 'center' },
+  dragHandle: { width: 42, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' },
+  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
+  headerTitleContainer: { flex: 1 },
+  headerSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 11, textTransform: 'uppercase', fontFamily: 'PoppinsMedium' },
+  headerTitle: { color: '#FFF', fontSize: 20, fontFamily: 'MontserratBold' },
+  closeButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  footerActions: { marginTop: 10, gap: 10 },
+  editModeButton: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 15, gap: 10 },
+  saveButton: { borderRadius: 15, overflow: 'hidden' },
+  saveGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
+  buttonText: { color: '#FFF', fontSize: 16, fontFamily: 'PoppinsSemiBold' },
+  cancelButton: { alignItems: 'center', paddingVertical: 8 },
+  cancelButtonText: { color: COLORS.danger, fontFamily: 'PoppinsMedium' },
+  readOnlyBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 15, gap: 8 },
+  readOnlyText: { color: '#64748B', fontFamily: 'PoppinsMedium' },
 });
 
 export default EditProductModal;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView, StatusBar, View, ActivityIndicator, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../services/firebaseConfig';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore'; // Tambah doc & getDoc
+import { auth, db } from '../../services/firebaseConfig'; // Pastikan auth diimport
 import { COLORS } from '../../constants/colors';
 
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -24,6 +24,9 @@ const ProductScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✅ PERBAIKAN: State role sekarang dinamis
+  const [userRole, setUserRole] = useState<'admin' | 'kasir'>('kasir'); // Default ke kasir untuk keamanan
+
   // State untuk Edit Modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -33,6 +36,26 @@ const ProductScreen = ({ navigation }: any) => {
   const [sortType, setSortType] = useState<SortType>('newest');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  // ✅ FUNGSI BARU: Ambil Role dari Firestore
+  const fetchUserRole = useCallback(async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        // Ambil dokumen user berdasarkan UID dari koleksi 'users'
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUserRole(userData.role); // Set role sesuai data di Firestore ("admin" atau "kasir")
+          console.log("Current User Role:", userData.role);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+    }
+  }, []);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -51,14 +74,17 @@ const ProductScreen = ({ navigation }: any) => {
     }
   }, []);
 
+  // ✅ Ambil role dan data produk saat komponen dimuat
   useEffect(() => {
+    fetchUserRole();
     loadProducts();
-  }, [loadProducts]);
+  }, [fetchUserRole, loadProducts]);
 
   useFocusEffect(
     useCallback(() => {
+      fetchUserRole();
       loadProducts();
-    }, [loadProducts])
+    }, [fetchUserRole, loadProducts])
   );
 
   const handleSortChange = (newSort: SortType) => {
@@ -69,15 +95,13 @@ const ProductScreen = ({ navigation }: any) => {
     setFilterMode(newMode);
   };
 
-  // Handler untuk membuka edit modal
   const handleEditPress = (product: Product) => {
     setSelectedProduct(product);
     setShowEditModal(true);
   };
 
-  // Handler setelah edit berhasil
   const handleEditSuccess = () => {
-    loadProducts(); // Refresh data
+    loadProducts();
   };
 
   const filterProps = {
@@ -122,12 +146,15 @@ const ProductScreen = ({ navigation }: any) => {
         />
       </RoundedContentScreen>
 
-      <FloatingAddButton onPress={() => navigation?.navigate('AddProduct')} />
+      {/* ✅ Tombol Tambah hanya muncul untuk admin */}
+      {userRole === 'admin' && (
+        <FloatingAddButton onPress={() => navigation?.navigate('AddProduct')} />
+      )}
 
-      {/* Edit Product Modal */}
       <EditProductModal
         visible={showEditModal}
         product={selectedProduct}
+        userRole={userRole} // ✅ Role dikirim secara dinamis
         onClose={() => {
           setShowEditModal(false);
           setSelectedProduct(null);

@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, StatusBar, Modal, Animated,
+  View, Text, StyleSheet, ScrollView, StatusBar, Modal,
   TouchableWithoutFeedback, Dimensions, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 
@@ -12,7 +12,7 @@ import { SubmitButton } from '../../../components/addproduct/SubmitButton';
 import BarcodeScannerScreen from '../BarcodeScannerScreen';
 
 const { height } = Dimensions.get('window');
-const MAX_MODAL_HEIGHT = height * 0.85;
+const MAX_MODAL_HEIGHT = height * 0.9; // Sedikit lebih tinggi untuk kenyamanan input
 
 interface AddProductModalProps {
   visible: boolean;
@@ -21,30 +21,7 @@ interface AddProductModalProps {
 }
 
 const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onSuccess }) => {
-  const slideAnim = useRef(new Animated.Value(height)).current;
   const scrollViewRef = useRef<ScrollView>(null);
-
-  const animateModal = useCallback((toValue: number, callback?: () => void) => {
-    if (toValue === 0) {
-      Animated.spring(slideAnim, {
-        toValue,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 90,
-      }).start(callback);
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: height,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(callback);
-    }
-  }, [slideAnim]);
-
-  useEffect(() => {
-    if (visible) animateModal(0);
-    else slideAnim.setValue(height);
-  }, [visible, animateModal, slideAnim]);
 
   const {
     formData, loading, showScanner, imageUri,
@@ -56,13 +33,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onS
   });
 
   const handleClose = useCallback(() => {
-    animateModal(height, () => {
-      resetForm();
-      onClose();
-    });
-  }, [onClose, animateModal, resetForm]);
+    resetForm();
+    onClose();
+  }, [onClose, resetForm]);
 
-  // FUNGSI BARU: Menampilkan pilihan tipe barcode
   const onAutoGeneratePress = () => {
     Alert.alert(
       "Opsi Generate Barcode",
@@ -82,7 +56,12 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onS
   };
 
   return (
-    <Modal transparent visible={visible} animationType="none">
+    <Modal 
+      transparent 
+      visible={visible} 
+      animationType="slide" // ✅ Kecepatan slide mengikuti standar native (sama dengan transaksi)
+      onRequestClose={handleClose}
+    >
       <StatusBar translucent backgroundColor="rgba(0,0,0,0.5)" barStyle="light-content" />
       <View style={styles.overlay}>
         <TouchableWithoutFeedback onPress={handleClose}>
@@ -93,10 +72,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onS
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
         >
-          <Animated.View
+          <View
             style={[
               styles.modalContainer,
-              { maxHeight: MAX_MODAL_HEIGHT, transform: [{ translateY: slideAnim }] },
+              { maxHeight: MAX_MODAL_HEIGHT },
             ]}
           >
             <ProductFormHeader onClose={handleClose} isModal />
@@ -109,6 +88,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onS
                 keyboardShouldPersistTaps="handled"
               >
                 <ProductFormFields
+                  isEditable={true} // ✅ Pastikan selalu true untuk tambah produk baru
                   name={formData.name}
                   price={formData.price}
                   purchasePrice={formData.purchasePrice}
@@ -127,7 +107,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onS
                   onPickImage={pickImage}
                   onRemoveImage={removeImage}
                   onScanPress={() => setShowScanner(true)}
-                  onAutoGeneratePress={onAutoGeneratePress} // Menggunakan fungsi pilihan
+                  onAutoGeneratePress={onAutoGeneratePress}
                   onFieldFocus={(fieldY) => {
                     scrollViewRef.current?.scrollTo({ y: fieldY - 60, animated: true });
                   }}
@@ -148,7 +128,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ visible, onClose, onS
                 onScan={handleBarcodeScanned}
               />
             )}
-          </Animated.View>
+          </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>

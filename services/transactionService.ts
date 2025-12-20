@@ -3,60 +3,69 @@ import {
   runTransaction, 
   doc, 
   collection, 
-  serverTimestamp // <--- Tambahkan impor ini
+  serverTimestamp,
+  increment 
 } from 'firebase/firestore';
 
-/**
- * Fungsi untuk menangani proses checkout transaksi
- * Mengurangi stok produk dan menyimpan riwayat transaksi secara atomik
- */
-export const handleCheckout = async (cartItems: any[], total: number, cashierId: string) => {
-    try {
-        await runTransaction(db, async (transaction) => {
-            // 1. Validasi Stok & Dapatkan Product DocRefs
-            for (const item of cartItems) {
-                const productRef = doc(db, 'products', item.id);
-                const productDoc = await transaction.get(productRef);
+export const handleCheckoutProcess = async (cartItems: any[], total: number, user: any) => {
+  try {
+    return await runTransaction(db, async (transaction) => {
+      // 1. Validasi Stok & Dapatkan Data Terbaru secara Atomik
+      for (const item of cartItems) {
+        const productRef = doc(db, 'products', item.id);
+        const productDoc = await transaction.get(productRef);
 
-                if (!productDoc.exists()) {
-                    throw "Produk tidak ditemukan!";
-                }
+        if (!productDoc.exists()) {
+          throw new Error(`Produk ${item.name} tidak ditemukan!`);
+        }
 
-                const currentStock = productDoc.data().stock;
-                const newStock = currentStock - item.qty;
-                
-                if (newStock < 0) {
-                    throw `Stok ${productDoc.data().name} tidak cukup.`;
-                }
+        const currentStock = productDoc.data().stock;
+        if (currentStock < item.qty) {
+          throw new Error(`Stok ${item.name} tidak cukup. Tersisa: ${currentStock}`);
+        }
+      }
 
-                // 2. Update Stok ke Database
-                transaction.update(productRef, { stock: newStock });
-            }
+      // 2. Generate Nomor Transaksi dari Counter
+      const counterRef = doc(db, 'counters', 'transactions');
+      const counterSnap = await transaction.get(counterRef);
+      let nextNumber = 1;
+      if (counterSnap.exists()) {
+        nextNumber = (counterSnap.data()?.count || 0) + 1;
+      }
+      transaction.set(counterRef, { count: increment(1) }, { merge: true });
 
-            // 3. Simpan Data Transaksi
-            const transactionRef = doc(collection(db, 'transactions')); 
-            const now = new Date();
-            
-            transaction.set(transactionRef, {
-                transactionNumber: `TRX-${now.getTime()}`, // Generator nomor transaksi sederhana
-                cashierId: cashierId,
-                total: total,
-                date: now,
-                createdAt: serverTimestamp(), // Menggunakan serverTimestamp dari Firestore
-                items: cartItems.map(item => ({ 
-                    productId: item.id, 
-                    qty: item.qty, 
-                    price: item.price,
-                    subtotal: item.qty * item.price 
-                }))
-            });
-        });
-        
-        console.log("Transaksi berhasil disimpan.");
-        return { success: true };
+      const year = new Date().getFullYear();
+      const transactionNumber = `TRX-${year}-${String(nextNumber).padStart(4, '0')}`;
 
-    } catch (e) {
-        console.error("Checkout gagal: ", e);
-        throw e; // Lemparkan error agar bisa ditangkap oleh UI/Component
-    }
+      // 3. Update Stok Produk
+      cartItems.forEach((item) => {
+        const pRef = doc(db, 'products', item.id);
+        transaction.update(pRef, { stock: increment(-item.qty) });
+      });
+
+      // 4. Simpan Data Transaksi
+      const transactionRef = doc(collection(db, 'transactions'));
+      transaction.set(transactionRef, {
+        transactionNumber,
+        cashierId: user.uid,
+        cashierName: user.displayName || user.email?.split('@')[0] || 'Kasir',
+        cashierEmail: user.email,
+        total: total,
+        date: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        items: cartItems.map(item => ({
+          productId: item.id,
+          productName: item.name,
+          qty: item.qty,
+          price: item.price,
+          subtotal: item.qty * item.price
+        }))
+      });
+
+      return { success: true, transactionNumber };
+    });
+  } catch (e) {
+    console.error("Transaction Error: ", e);
+    throw e;
+  }
 };
