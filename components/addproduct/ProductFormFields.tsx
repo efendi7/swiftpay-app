@@ -1,16 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Image } from 'react-native';
 import { 
-  Tag, 
-  HandCoins, 
-  Layers, 
-  Barcode, 
-  Coins, 
-  Truck, 
-  LayoutGrid, 
-  Maximize,
-  Camera,
-  X
+  Tag, HandCoins, Layers, Barcode, Coins, Truck, 
+  LayoutGrid, Maximize, Camera, X 
 } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
 import FloatingLabelInput from '../FloatingLabelInput';
@@ -36,7 +28,7 @@ export interface ProductFormFieldsProps {
   onScanPress: () => void;
   onAutoGeneratePress: () => void;
   onFieldFocus?: (y: number) => void;
-  isEditable?: boolean; // Prop tambahan untuk kontrol Read-Only
+  isEditable?: boolean;
 }
 
 export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
@@ -44,9 +36,8 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
   onChangeName, onChangePrice, onChangePurchasePrice, onChangeSupplier,
   onChangeCategory, onChangeStock, onChangeBarcode, onPickImage, onRemoveImage,
   onScanPress, onAutoGeneratePress, onFieldFocus,
-  isEditable = true, // Default true agar bisa digunakan di layar Tambah Produk
+  isEditable = true,
 }) => {
-  // Warna ikon dinamis: Biru jika bisa edit, Abu-abu jika read-only
   const iconColor = isEditable ? COLORS.primary : '#94A3B8';
 
   return (
@@ -86,8 +77,8 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
       </View>
 
       {/* --- SECTION: INPUT FIELDS --- */}
-      {/* Container dibungkus pointerEvents agar input benar-benar tidak bisa ditekan saat read-only */}
-      <View pointerEvents={isEditable ? 'auto' : 'none'}>
+      {/* Perbaikan: pointerEvents dihapus agar TextInput yang read-only tetap bisa di-scroll horizontal */}
+      <View>
         <FloatingLabelInput
           label="Nama Produk"
           value={name}
@@ -171,7 +162,6 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
       </View>
 
       {/* --- SECTION: ACTIONS --- */}
-      {/* Tombol SCAN dan AUTO hanya muncul jika isEditable true */}
       {isEditable && (
         <View style={styles.actions}>
           <TouchableOpacity style={styles.btn} onPress={onScanPress}>
@@ -189,101 +179,20 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
 };
 
 const styles = StyleSheet.create({
-  card: { 
-    backgroundColor: '#fff', 
-    borderRadius: 24, 
-    padding: 18,
-  },
-  imageSection: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  sectionLabel: {
-    fontFamily: 'PoppinsBold',
-    fontSize: 14,
-    color: COLORS.textDark,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  imageUploadBox: {
-    width: '100%',
-    height: 140,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  imageBoxActive: {
-    borderStyle: 'solid',
-    borderColor: COLORS.primary,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholderContainer: {
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  uploadText: {
-    fontFamily: 'PoppinsSemiBold',
-    fontSize: 12,
-    color: COLORS.primary,
-  },
-  removeImageBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255, 68, 68, 0.8)',
-    padding: 4,
-    borderRadius: 12,
-  },
-  row: { 
-    flexDirection: 'row', 
-    gap: 10 
-  },
-  flex: { 
-    flex: 1 
-  },
-  actions: { 
-    flexDirection: 'row', 
-    justifyContent: 'flex-end', 
-    gap: 8, 
-    marginTop: 12
-  },
-  btn: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: COLORS.secondary, 
-    paddingHorizontal: 14, 
-    paddingVertical: 9, 
-    borderRadius: 10 
-  },
-  btnAlt: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FF8A65', 
-    paddingHorizontal: 14, 
-    paddingVertical: 9, 
-    borderRadius: 10 
-  },
-  btnText: { 
-    color: '#fff', 
-    fontFamily: 'PoppinsBold', 
-    fontSize: 12 
-  },
+  card: { backgroundColor: '#fff', borderRadius: 24, padding: 18 },
+  imageSection: { marginBottom: 20, alignItems: 'center' },
+  sectionLabel: { fontFamily: 'PoppinsBold', fontSize: 14, color: COLORS.textDark, alignSelf: 'flex-start', marginBottom: 10 },
+  imageUploadBox: { width: '100%', height: 140, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  imageBoxActive: { borderStyle: 'solid', borderColor: COLORS.primary },
+  previewImage: { width: '100%', height: '100%' },
+  placeholderContainer: { alignItems: 'center' },
+  iconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  uploadText: { fontFamily: 'PoppinsSemiBold', fontSize: 12, color: COLORS.primary },
+  removeImageBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255, 68, 68, 0.8)', padding: 4, borderRadius: 12 },
+  row: { flexDirection: 'row', gap: 10 },
+  flex: { flex: 1 },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
+  btn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.secondary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 },
+  btnAlt: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FF8A65', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 },
+  btnText: { color: '#fff', fontFamily: 'PoppinsBold', fontSize: 12 },
 });

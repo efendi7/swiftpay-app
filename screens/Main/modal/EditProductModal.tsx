@@ -118,20 +118,21 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
             ]}
           >
             <LinearGradient
-              colors={isEditable ? [COLORS.primary, '#2c537a'] : ['#475569', '#1e293b']}
-              style={[styles.header, { paddingTop: insets.top + 12 }]}
-            >
-              <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
-              <View style={styles.headerContent}>
-                <View style={styles.headerTitleContainer}>
-                  <Text style={styles.headerSubtitle}>{isEditable ? "Mode Edit" : "Informasi"}</Text>
-                  <Text style={styles.headerTitle}>{isEditable ? "Edit Produk" : "Detail Produk"}</Text>
-                </View>
-                <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                  <X size={24} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
+  colors={isEditable ? [COLORS.primary, '#2c537a'] : ['#475569', '#1e293b']}
+  // DIUBAH: Gunakan padding standar (biasanya 16-20), jangan tambahkan insets.top berlebih
+  style={styles.header} 
+>
+  <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
+  <View style={styles.headerContent}>
+    <View style={styles.headerTitleContainer}>
+      <Text style={styles.headerSubtitle}>{isEditable ? "Mode Edit" : "Informasi"}</Text>
+      <Text style={styles.headerTitle}>{isEditable ? "Edit Produk" : "Detail Produk"}</Text>
+    </View>
+    <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+      <X size={24} color="#FFF" />
+    </TouchableOpacity>
+  </View>
+</LinearGradient>
 
             <View style={styles.contentWrapper}>
               <ScrollView

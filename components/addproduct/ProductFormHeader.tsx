@@ -8,31 +8,42 @@ import { COLORS } from '../../constants/colors';
 interface ProductFormHeaderProps {
   onClose: () => void;
   isModal?: boolean;
+  title?: string;
+  subtitle?: string;
 }
 
 export const ProductFormHeader: React.FC<ProductFormHeaderProps> = ({
   onClose,
   isModal = false,
+  title = "Tambah Produk",
+  subtitle = "Manajemen Produk"
 }) => {
   const insets = useSafeAreaInsets();
 
   return (
     <LinearGradient
       colors={[COLORS.primary, '#2c537a']}
-      style={[styles.header, { paddingTop: insets.top + 12 }]}
+      // Menggunakan logika padding yang sama persis dengan ScreenHeader
+      style={[
+        styles.header, 
+        { paddingTop: isModal ? 16 : insets.top + 12 }
+      ]}
     >
-      <View style={styles.dragHandleContainer}>
-        <View style={styles.dragHandle} />
-      </View>
+      {/* Drag Handle diposisikan absolut agar tidak mendorong konten utama ke bawah */}
+      {isModal && (
+        <View style={styles.dragHandleContainer}>
+          <View style={styles.dragHandle} />
+        </View>
+      )}
 
       <View style={styles.headerContent}>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerSubtitle}>Manajemen Produk</Text>
-          <Text style={styles.headerTitle}>Tambah Produk</Text>
+          <Text style={styles.headerSubtitle}>{subtitle}</Text>
+          <Text style={styles.headerTitle}>{title}</Text>
         </View>
 
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <X size={24} color="#FFF" />
+          <X size={26} color="#FFF" />
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -41,7 +52,8 @@ export const ProductFormHeader: React.FC<ProductFormHeaderProps> = ({
 
 const styles = StyleSheet.create({
   header: {
-    paddingBottom: 36,
+    // DISAMAKAN: Padding bawah 36 mengikuti ScreenHeader
+    paddingBottom: 36, 
     paddingHorizontal: 20,
   },
   dragHandleContainer: {
@@ -53,16 +65,17 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   dragHandle: {
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 20,
+    // DISAMAKAN: Margin top 20 mengikuti ScreenHeader
+    marginTop: 20, 
   },
   headerTitleContainer: {
     flex: 1,
@@ -72,12 +85,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    fontFamily: 'PoppinsMedium',
+    fontFamily: 'MontserratSemiBold',
   },
   headerTitle: {
     color: '#FFF',
     fontSize: 22,
-    fontFamily: 'MontserratBold',
+    fontFamily: 'PoppinsBold',
+    marginTop: 4,
+    lineHeight: 28,
   },
   closeButton: {
     width: 40,
@@ -88,3 +103,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+export default ProductFormHeader;
