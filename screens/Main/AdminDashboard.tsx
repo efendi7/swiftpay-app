@@ -6,10 +6,14 @@ import {
   Animated, 
   StatusBar, 
   ActivityIndicator, 
-  RefreshControl 
+  RefreshControl,
+  Modal,
+  ScrollView,
+  TouchableOpacity
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { X } from 'lucide-react-native'; // Tambah import X
 import { COLORS } from '../../constants/colors';
 import { useDashboard } from '../../hooks/useDashboard';
 
@@ -19,12 +23,14 @@ import { StatsGrid } from '../../components/dashboard/StatsGrid';
 import { DashboardChart } from '../../components/dashboard/DashboardChart';
 import { DateRangeSelector } from '../../components/dashboard/DateRangeSelector';
 import { ProductRankingCard } from '../../components/dashboard/ProductRankingCard';
+import { RecentActivityCard } from '../../components/dashboard/RecentActivityCard';
 
 const AdminDashboard = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { loading, stats, selectedPreset, refreshData, setPresetRange } = useDashboard();
+  const { loading, stats, activities, selectedPreset, refreshData, setPresetRange } = useDashboard();
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false); // State Modal
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const HEADER_MAX_HEIGHT = 230 + insets.top;
@@ -129,7 +135,6 @@ const AdminDashboard = () => {
             />
           </View>
 
-          {/* SECTION: DIAGRAM BATANG / PROGRESS BAR RANKING */}
           <View style={styles.rankingSection}>
             <ProductRankingCard 
               title="Top 10 Penjualan Produk"
@@ -144,11 +149,44 @@ const AdminDashboard = () => {
               unit="Unit"
               color="#3b82f6" 
             />
+
+            {/* TAMPILKAN 5 AKTIVITAS TERBARU */}
+            <RecentActivityCard 
+              activities={activities.slice(0, 5)}
+              onSeeMore={() => setModalVisible(true)}
+            />
           </View>
         </View>
 
         <Text style={styles.footerBrand}>Swiftstock by Efendi 2025</Text>
       </Animated.ScrollView>
+
+      {/* MODAL RIWAYAT LENGKAP */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingTop: insets.top + 20 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Riwayat Aktivitas</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color={COLORS.textDark} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ padding: 20 }}>
+                <RecentActivityCard 
+                  activities={activities}
+                  onSeeMore={() => {}} // Sembunyikan tombol di dalam modal
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -172,7 +210,7 @@ const styles = StyleSheet.create({
   rankingSection: {
     marginTop: 20,
     paddingBottom: 20,
-    gap: 10,
+    gap: 15, // Diperbesar sedikit agar tidak terlalu rapat
   },
   footerBrand: { 
     textAlign: 'center', 
@@ -180,6 +218,32 @@ const styles = StyleSheet.create({
     fontSize: 11, 
     marginTop: 40, 
     fontFamily: 'PoppinsRegular' 
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    height: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'PoppinsBold',
+    color: COLORS.textDark,
   },
 });
 

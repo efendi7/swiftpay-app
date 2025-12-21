@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Image,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -27,8 +28,8 @@ interface DashboardHeaderProps {
   totalRevenue: number;
   totalExpense: number;
   totalProfit: number;
-  lowStockCount: number; // 🔔 Tambah prop
-  onLowStockPress: () => void; // 🔔 Handler ketika bell diklik
+  lowStockCount: number;
+  onLowStockPress: () => void;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
@@ -62,10 +63,22 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       : require('../../assets/images/dashboard/sad.png');
   };
 
+  // --- HELPER TRUNCATE RUPIAH ---
+  const formatCompact = (val: number) => {
+    if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)} M`;
+    if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)} jt`;
+    if (val >= 1000) return `Rp ${(val / 1000).toFixed(0)} rb`;
+    return DashboardService.formatCurrency(val);
+  };
+
+  const showDetailValue = (label: string, value: number) => {
+    Alert.alert(label, DashboardService.formatCurrency(value), [{ text: 'Oke' }]);
+  };
+
   // --- LOGIKA BELL ALERT ---
   const hasLowStock = lowStockCount > 0;
-  const bellColor = hasLowStock ? '#EF4444' : '#10B981'; // Merah/Hijau
-  const bellBgColor = hasLowStock ? '#FEE2E2' : '#D1FAE5'; // Merah muda/Hijau muda
+  const bellColor = hasLowStock ? '#EF4444' : '#10B981';
+  const bellBgColor = hasLowStock ? '#FEE2E2' : '#D1FAE5';
 
   const handleLogout = async () => {
     try {
@@ -95,18 +108,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </View>
 
         <View style={styles.headerRightButtons}>
-          {/* 🔔 BELL ALERT */}
           <TouchableOpacity
             style={[styles.bellCircle, { backgroundColor: bellBgColor }]}
             onPress={onLowStockPress}
-            accessibilityLabel={hasLowStock ? `${lowStockCount} produk stok rendah` : 'Stok aman'}
-            accessibilityRole="button"
           >
-            {hasLowStock ? (
-              <Siren size={20} color={bellColor} />
-            ) : (
-              <HeartPulse size={20} color={bellColor} />
-            )}
+            {hasLowStock ? <Siren size={20} color={bellColor} /> : <HeartPulse size={20} color={bellColor} />}
             {hasLowStock && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{lowStockCount}</Text>
@@ -114,77 +120,65 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             )}
           </TouchableOpacity>
 
-          {/* LOGOUT BUTTON */}
-          <TouchableOpacity
-            style={styles.logoutCircle}
-            onPress={handleLogout}
-          >
+          <TouchableOpacity style={styles.logoutCircle} onPress={handleLogout}>
             <LogOut size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* PROFIT CARD */}
-      <Animated.View
-        style={[
-          styles.profitCard,
-          { opacity: revenueOpacity },
-        ]}
-      >
-        <View style={styles.profitLeft}>
+      <Animated.View style={[styles.profitCard, { opacity: revenueOpacity }]}>
+        <TouchableOpacity 
+          style={styles.profitLeft} 
+          onPress={() => showDetailValue('Total Laba/Rugi', totalProfit)}
+        >
           <Text
-            style={[
-              styles.profitValue,
-              { color: getStatusColor() },
-            ]}
+            numberOfLines={1}
+            style={[styles.profitValue, { color: getStatusColor() }]}
           >
-            {DashboardService.formatCurrency(totalProfit)}
+            {formatCompact(totalProfit)}
           </Text>
-
-          <Text
-            style={[
-              styles.profitMessage,
-              { color: getStatusColor() },
-            ]}
-          >
+          <Text style={[styles.profitMessage, { color: getStatusColor() }]}>
             {getStatusMessage()}
           </Text>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.profitImageWrapper}>
-          <Image
-            source={getStatusImage()}
-            style={styles.profitImage}
-            resizeMode="contain"
-          />
+          <Image source={getStatusImage()} style={styles.profitImage} resizeMode="contain" />
         </View>
       </Animated.View>
 
       {/* BOTTOM STATS */}
       <View style={styles.bottomStats}>
-        <View style={styles.bottomCardCompact}>
+        <TouchableOpacity 
+          style={styles.bottomCardCompact}
+          onPress={() => showDetailValue('Total Pendapatan', totalRevenue)}
+        >
           <View style={styles.iconBoxGreen}>
             <TrendingUp size={16} color={COLORS.secondary} />
           </View>
           <View style={styles.bottomTextWrap}>
             <Text style={styles.bottomLabel}>Pendapatan</Text>
-            <Text style={styles.bottomValue}>
-              {DashboardService.formatCurrency(totalRevenue)}
+            <Text style={styles.bottomValue} numberOfLines={1}>
+              {formatCompact(totalRevenue)}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.bottomCardCompact}>
+        <TouchableOpacity 
+          style={styles.bottomCardCompact}
+          onPress={() => showDetailValue('Total Pengeluaran', totalExpense)}
+        >
           <View style={styles.iconBoxRed}>
             <TrendingDown size={16} color="#E74C3C" />
           </View>
           <View style={styles.bottomTextWrap}>
             <Text style={styles.bottomLabel}>Pengeluaran</Text>
-            <Text style={styles.bottomValue}>
-              {DashboardService.formatCurrency(totalExpense)}
+            <Text style={styles.bottomValue} numberOfLines={1}>
+              {formatCompact(totalExpense)}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -203,73 +197,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     elevation: 5,
   },
-
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 50,
-  },
-
-  greeting: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    fontFamily: 'PoppinsRegular',
-  },
-
-  adminName: {
-    color: '#FFF',
-    fontSize: 20,
-    fontFamily: 'MontserratBold',
-  },
-
-  // 🔔 Container untuk Bell + Logout
-  headerRightButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-
-  // 🔔 Bell Button dengan warna dinamis
-  bellCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-
-  // 🔔 Badge untuk jumlah stok rendah
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-
-  badgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontFamily: 'PoppinsBold',
-  },
-
-  logoutCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  /* ===== PROFIT ===== */
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 50 },
+  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontFamily: 'PoppinsRegular' },
+  adminName: { color: '#FFF', fontSize: 20, fontFamily: 'MontserratBold' },
+  headerRightButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bellCircle: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  badge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  badgeText: { color: '#FFF', fontSize: 10, fontFamily: 'PoppinsBold' },
+  logoutCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  
   profitCard: {
     marginTop: 12,
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -279,47 +215,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    overflow: 'visible',
   },
+  profitLeft: { flex: 1 },
+  profitValue: { fontSize: 22, fontFamily: 'PoppinsBold' },
+  profitMessage: { fontSize: 11, marginTop: -2, fontFamily: 'PoppinsMedium' },
+  profitImageWrapper: { width: 60, height: 50, marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
+  profitImage: { width: 85, height: 85, position: 'absolute', right: -12, top: -18 },
 
-  profitLeft: {
-    flex: 1,
-  },
-
-  profitValue: {
-    fontSize: 18,
-    fontFamily: 'PoppinsBold',
-  },
-
-  profitMessage: {
-    fontSize: 11,
-    marginTop: 2,
-    fontFamily: 'PoppinsMedium',
-  },
-
-  profitImageWrapper: {
-    width: 60,
-    height: 56,
-    marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'visible',
-  },
-
-  profitImage: {
-    width: 90,
-    height: 90,
-    position: 'absolute',
-    right: -12,
-    top: -18,
-  },
-
-  bottomStats: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
+  bottomStats: { marginTop: 10, flexDirection: 'row', justifyContent: 'space-between' },
   bottomCardCompact: {
     flex: 1,
     flexDirection: 'row',
@@ -330,41 +233,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     borderRadius: 14,
   },
-
-  bottomTextWrap: {
-    marginLeft: 8,
-    flex: 1,
-  },
-
-  bottomLabel: {
-    fontSize: 10,
-    color: '#FFF',
-    opacity: 0.75,
-    fontFamily: 'PoppinsRegular',
-  },
-
-  bottomValue: {
-    fontSize: 12,
-    color: '#FFF',
-    marginTop: 1,
-    fontFamily: 'PoppinsBold',
-  },
-
-  iconBoxGreen: {
-    backgroundColor: '#E9F9EF',
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  iconBoxRed: {
-    backgroundColor: '#FDECEA',
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  bottomTextWrap: { marginLeft: 8, flex: 1 },
+  bottomLabel: { fontSize: 10, color: '#FFF', opacity: 0.8, fontFamily: 'PoppinsRegular' },
+  bottomValue: { fontSize: 13, color: '#FFF', fontFamily: 'PoppinsBold' },
+  iconBoxGreen: { backgroundColor: '#E9F9EF', width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  iconBoxRed: { backgroundColor: '#FDECEA', width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
 });

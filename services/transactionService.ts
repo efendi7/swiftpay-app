@@ -9,23 +9,23 @@ import {
 
 /**
  * Fungsi untuk menangani proses checkout transaksi
- * Menerima 5 argumen untuk mendukung pencatatan uang tunai dan metode pembayaran
+ * Mencatat transaksi ke Firestore dan membuat log aktivitas otomatis
  */
 export const handleCheckoutProcess = async (
   cartItems: any[], 
   total: number, 
   user: any,
-  cashAmount: number,   // Tambahan argumen ke-4
-  changeAmount: number, // Tambahan argumen ke-5
-  paymentMethod: 'cash' | 'qris' = 'cash' // Tambahan opsional untuk logging
+  cashAmount: number,
+  changeAmount: number,
+  paymentMethod: 'cash' | 'qris' = 'cash'
 ) => {
   try {
     return await runTransaction(db, async (transaction) => {
-      // 1. Validasi Stok & Dapatkan Data Terbaru secara Atomik
+      // 1. Validasi Stok secara Atomik
       for (const item of cartItems) {
         const productRef = doc(db, 'products', item.id);
         const productDoc = await transaction.get(productRef);
-
+        
         if (!productDoc.exists()) {
           throw new Error(`Produk ${item.name} tidak ditemukan!`);
         }
@@ -54,7 +54,7 @@ export const handleCheckoutProcess = async (
         transaction.update(pRef, { stock: increment(-item.qty) });
       });
 
-      // 4. Simpan Data Transaksi
+      // 4. Simpan Data Transaksi Utama
       const transactionRef = doc(collection(db, 'transactions'));
       transaction.set(transactionRef, {
         transactionNumber,
@@ -62,9 +62,9 @@ export const handleCheckoutProcess = async (
         cashierName: user.displayName || user.email?.split('@')[0] || 'Kasir',
         cashierEmail: user.email,
         total: total,
-        cashAmount: cashAmount,     // Menyimpan uang tunai yang diterima
-        changeAmount: changeAmount, // Menyimpan kembalian
-        paymentMethod: paymentMethod, // Menyimpan metode (cash/qris)
+        cashAmount: cashAmount,
+        changeAmount: changeAmount,
+        paymentMethod: paymentMethod,
         date: serverTimestamp(),
         createdAt: serverTimestamp(),
         items: cartItems.map(item => ({
@@ -74,6 +74,36 @@ export const handleCheckoutProcess = async (
           price: item.price,
           subtotal: item.qty * item.price
         }))
+      });
+
+      // 5. LOG AKTIVITAS - Format Kalimat Sesuai Permintaan
+      const activityRef = doc(collection(db, 'activities'));
+      
+      // Hitung total quantity produk yang keluar
+      const totalQty = cartItems.reduce((sum, item) => sum + item.qty, 0);
+
+      // Format daftar produk: 2 unit "Indomie", 1 unit "Susu"
+      const productList = cartItems.map(item => `${item.qty} unit "${item.name}"`).join(', ');
+      
+      // Format nominal harga ke Rupiah
+      const formattedPrice = `Rp ${total.toLocaleString('id-ID')}`;
+      const method = paymentMethod.toUpperCase();
+      
+      // Susun pesan utama
+      let message = `Kasir Checkout total ${totalQty} produk yaitu ${productList} via ${method} seharga ${formattedPrice}`;
+      
+      // Tambahkan detail kembalian jika ada
+      if (paymentMethod === 'cash' && changeAmount > 0) {
+        const formattedChange = `Rp ${changeAmount.toLocaleString('id-ID')}`;
+        message += ` dengan kembalian ${formattedChange}`;
+      }
+
+      // Simpan log ke koleksi activities
+      transaction.set(activityRef, {
+        type: 'OUT',
+        message: message,
+        userName: user.displayName || user.email?.split('@')[0] || 'Kasir',
+        createdAt: serverTimestamp(),
       });
 
       return { success: true, transactionNumber };

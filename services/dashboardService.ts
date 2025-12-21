@@ -1,11 +1,46 @@
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp, limit, orderBy } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { DashboardStats, ProductStat, DateRange } from '../types/dashboard.types';
 
 export class DashboardService {
   /**
-   * Fetch semua data dashboard berdasarkan rentang tanggal dan preset
+   * Fetch riwayat aktivitas terbaru untuk dashboard
    */
+  static async fetchRecentActivities(limitCount: number = 20) {
+    try {
+      const q = query(
+        collection(db, 'activities'),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          type: data.type,
+          message: data.message,
+          userName: data.userName,
+          time: this.formatRelativeTime(data.createdAt?.toDate()),
+          createdAt: data.createdAt
+        };
+      });
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+      return [];
+    }
+  }
+
+  private static formatRelativeTime(date: Date) {
+    if (!date) return 'Baru saja';
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffInSeconds < 60) return 'Baru saja';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m lalu`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}j lalu`;
+    return date.toLocaleDateString('id-ID');
+  }
+
   static async fetchDashboardStats(
     dateRange: DateRange,
     preset: 'today' | 'week' | 'month' | 'year'
@@ -22,9 +57,7 @@ export class DashboardService {
       productsSnap.forEach((doc) => {
         const data = doc.data();
         const stock = Number(data.stock || 0);
-        
         if (stock < 10) lowStockCount++;
-
         stockRanking.push({
           id: doc.id,
           name: data.name || 'Tanpa Nama',
@@ -32,7 +65,7 @@ export class DashboardService {
         });
       });
 
-      // --- 2. DATA TRANSAKSI (PENJUALAN, REVENUE, & RANKING SALES) ---
+      // --- 2. DATA TRANSAKSI ---
       const transactionsQuery = query(
         collection(db, 'transactions'),
         where('date', '>=', startTimestamp),
@@ -52,23 +85,19 @@ export class DashboardService {
 
         const tDate = data.date?.toDate();
         if (tDate) {
-          // Mapping data untuk grafik
           const key = this.getChartKey(tDate, preset);
           if (chartDataMap.has(key)) {
             chartDataMap.set(key, (chartDataMap.get(key) || 0) + total);
           }
 
-          // Agregasi penjualan per produk untuk ranking
           if (Array.isArray(data.items)) {
             data.items.forEach((item: any) => {
               const qty = Number(item.qty || 0);
               totalOut += qty;
-
               const current = salesMap.get(item.productId) || {
                 name: item.productName || 'Produk Terhapus',
                 qty: 0,
               };
-              
               salesMap.set(item.productId, {
                 name: current.name,
                 qty: current.qty + qty,
@@ -78,14 +107,13 @@ export class DashboardService {
         }
       });
 
-      // Konversi Sales Map ke Array ProductStat
       const salesRanking: ProductStat[] = Array.from(salesMap, ([id, info]) => ({
         id,
         name: info.name,
         value: info.qty,
       }));
 
-      // --- 3. DATA PENGELUARAN (STOCK PURCHASES) ---
+      // --- 3. DATA PENGELUARAN ---
       const expenseQuery = query(
         collection(db, 'stock_purchases'),
         where('date', '>=', startTimestamp),
@@ -101,12 +129,6 @@ export class DashboardService {
         totalIn += Number(data.quantity || 0);
       });
 
-      // Mapping hasil Map ke format ChartDataPoint[]
-      const weeklyData = Array.from(chartDataMap, ([label, value]) => ({
-        label,
-        value,
-      }));
-
       return {
         totalProducts: productsSnap.size,
         totalTransactions: transactionsSnap.size,
@@ -116,9 +138,9 @@ export class DashboardService {
         lowStockCount,
         totalIn,
         totalOut,
-        weeklyData,
-        stockRanking, // Data mentah untuk di-sort di UI (Tinggi/Rendah)
-        salesRanking, // Data mentah untuk di-sort di UI (Tinggi/Rendah)
+        weeklyData: Array.from(chartDataMap, ([label, value]) => ({ label, value })),
+        stockRanking,
+        salesRanking,
       };
     } catch (error) {
       console.error('DashboardService Error:', error);
@@ -126,9 +148,6 @@ export class DashboardService {
     }
   }
 
-  /**
-   * Helper untuk inisialisasi Map data grafik berdasarkan preset
-   */
   private static generateChartDataMap(preset: string): Map<string, number> {
     const map = new Map<string, number>();
     if (preset === 'today') {
@@ -138,15 +157,11 @@ export class DashboardService {
     } else if (preset === 'year') {
       ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].forEach((m) => map.set(m, 0));
     } else {
-      // Default: Week
       ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((d) => map.set(d, 0));
     }
     return map;
   }
 
-  /**
-   * Helper untuk menentukan key (label) berdasarkan tanggal transaksi
-   */
   private static getChartKey(date: Date, preset: string): string {
     if (preset === 'today') {
       const h = date.getHours();
@@ -174,9 +189,6 @@ export class DashboardService {
     return days[date.getDay()];
   }
 
-  /**
-   * Helper untuk mendapatkan rentang tanggal berdasarkan preset
-   */
   static getPresetDateRange(preset: 'today' | 'week' | 'month' | 'year'): DateRange {
     const end = new Date();
     end.setHours(23, 59, 59, 999);
@@ -196,9 +208,6 @@ export class DashboardService {
     return { startDate: start, endDate: end };
   }
 
-  /**
-   * Helper untuk format angka ke mata uang Rupiah
-   */
   static formatCurrency(value: number): string {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',

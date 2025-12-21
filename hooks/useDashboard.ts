@@ -4,6 +4,7 @@ import { DashboardStats, DateRange } from '../types/dashboard.types';
 
 export const useDashboard = () => {
   const [loading, setLoading] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]); // Tambah state aktivitas
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0, 
     totalTransactions: 0, 
@@ -14,8 +15,8 @@ export const useDashboard = () => {
     totalIn: 0, 
     totalOut: 0, 
     weeklyData: [],
-    stockRanking: [], // Array untuk progress bar stok
-    salesRanking: [], // Array untuk progress bar penjualan
+    stockRanking: [],
+    salesRanking: [],
   });
 
   const [dateRange, setDateRange] = useState<DateRange>(
@@ -32,8 +33,14 @@ export const useDashboard = () => {
       const targetRange = customRange || dateRange;
       const targetPreset = preset || selectedPreset;
       
-      const data = await DashboardService.fetchDashboardStats(targetRange, targetPreset);
+      // Ambil Stats dan Aktivitas secara paralel
+      const [data, recentActs] = await Promise.all([
+        DashboardService.fetchDashboardStats(targetRange, targetPreset),
+        DashboardService.fetchRecentActivities(20) // Ambil 20 aktivitas terbaru
+      ]);
+
       setStats(data);
+      setActivities(recentActs);
       
       if (customRange) setDateRange(customRange);
       if (preset) setSelectedPreset(preset);
@@ -56,6 +63,7 @@ export const useDashboard = () => {
   return { 
     loading, 
     stats, 
+    activities, // Ekspos activities ke UI
     dateRange, 
     selectedPreset, 
     refreshData, 
