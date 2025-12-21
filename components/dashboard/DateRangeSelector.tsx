@@ -60,12 +60,13 @@ export const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginTop: 16, 
+    marginBottom: 0,
   },
   row: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   presetButton: {
     flex: 1,

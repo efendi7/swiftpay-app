@@ -72,10 +72,21 @@ export const BottomNavigation: React.FC<Props> = ({
         </TouchableOpacity>
 
         {/* 5. PROFIL */}
-        <TouchableOpacity style={styles.navItem}>
-          <User size={22} color={COLORS.textLight} />
-          <Text style={styles.navLabel}>Profil</Text>
-        </TouchableOpacity>
+<TouchableOpacity 
+  style={styles.navItem} 
+  onPress={() => navigation.navigate('Profile')}
+>
+  <User 
+    size={22} 
+    color={isActive('Profile') ? COLORS.secondary : COLORS.textLight} 
+  />
+  <Text style={[
+    styles.navLabel, 
+    { color: isActive('Profile') ? COLORS.secondary : COLORS.textLight }
+  ]}>
+    Profil
+  </Text>
+</TouchableOpacity>
       </View>
 
      {/* FAB BUTTON DI TENGAH */}

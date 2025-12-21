@@ -1,70 +1,115 @@
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { DashboardStats, ChartDataPoint, DateRange } from '../types/dashboard.types';
+import { DashboardStats, ProductStat, DateRange } from '../types/dashboard.types';
 
 export class DashboardService {
-  static formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency', currency: 'IDR', maximumFractionDigits: 0,
-    }).format(amount);
-  }
-
+  /**
+   * Fetch semua data dashboard berdasarkan rentang tanggal dan preset
+   */
   static async fetchDashboardStats(
-    dateRange: DateRange, 
+    dateRange: DateRange,
     preset: 'today' | 'week' | 'month' | 'year'
   ): Promise<DashboardStats> {
     try {
       const startTimestamp = Timestamp.fromDate(dateRange.startDate);
       const endTimestamp = Timestamp.fromDate(dateRange.endDate);
 
-      // 1. Total Produk (Static/Global)
+      // --- 1. DATA PRODUK (STOK & RANKING STOK) ---
       const productsSnap = await getDocs(collection(db, 'products'));
       let lowStockCount = 0;
-      productsSnap.forEach(doc => {
-        if (Number(doc.data().stock || 0) < 10) lowStockCount++;
+      const stockRanking: ProductStat[] = [];
+
+      productsSnap.forEach((doc) => {
+        const data = doc.data();
+        const stock = Number(data.stock || 0);
+        
+        if (stock < 10) lowStockCount++;
+
+        stockRanking.push({
+          id: doc.id,
+          name: data.name || 'Tanpa Nama',
+          value: stock,
+        });
       });
 
-      // 2. Stock In (Filtered)
-      const inQuery = query(collection(db, 'stock_purchases'), 
-        where('date', '>=', startTimestamp), where('date', '<=', endTimestamp));
-      const inSnap = await getDocs(inQuery);
-      let totalExpense = 0, totalIn = 0;
-      inSnap.forEach(doc => {
-        totalExpense += Number(doc.data().totalCost || 0);
-        totalIn += Number(doc.data().quantity || 0);
-      });
+      // --- 2. DATA TRANSAKSI (PENJUALAN, REVENUE, & RANKING SALES) ---
+      const transactionsQuery = query(
+        collection(db, 'transactions'),
+        where('date', '>=', startTimestamp),
+        where('date', '<=', endTimestamp)
+      );
+      const transactionsSnap = await getDocs(transactionsQuery);
 
-      // 3. Transactions (Filtered)
-      const outQuery = query(collection(db, 'transactions'), 
-        where('date', '>=', startTimestamp), where('date', '<=', endTimestamp));
-      const outSnap = await getDocs(outQuery);
-      let totalRevenue = 0, totalOut = 0;
-      
-      // Generate chart data based on preset
+      let totalRevenue = 0;
+      let totalOut = 0;
+      const salesMap = new Map<string, { name: string; qty: number }>();
       const chartDataMap = this.generateChartDataMap(preset);
 
-      outSnap.forEach(doc => {
+      transactionsSnap.forEach((doc) => {
         const data = doc.data();
         const total = Number(data.total || 0);
         totalRevenue += total;
-        
+
         const tDate = data.date?.toDate();
         if (tDate) {
+          // Mapping data untuk grafik
           const key = this.getChartKey(tDate, preset);
           if (chartDataMap.has(key)) {
             chartDataMap.set(key, (chartDataMap.get(key) || 0) + total);
           }
+
+          // Agregasi penjualan per produk untuk ranking
           if (Array.isArray(data.items)) {
-            data.items.forEach((item: any) => totalOut += Number(item.qty || 0));
+            data.items.forEach((item: any) => {
+              const qty = Number(item.qty || 0);
+              totalOut += qty;
+
+              const current = salesMap.get(item.productId) || {
+                name: item.productName || 'Produk Terhapus',
+                qty: 0,
+              };
+              
+              salesMap.set(item.productId, {
+                name: current.name,
+                qty: current.qty + qty,
+              });
+            });
           }
         }
       });
 
-      const weeklyData = Array.from(chartDataMap, ([label, value]) => ({ value, label }));
+      // Konversi Sales Map ke Array ProductStat
+      const salesRanking: ProductStat[] = Array.from(salesMap, ([id, info]) => ({
+        id,
+        name: info.name,
+        value: info.qty,
+      }));
+
+      // --- 3. DATA PENGELUARAN (STOCK PURCHASES) ---
+      const expenseQuery = query(
+        collection(db, 'stock_purchases'),
+        where('date', '>=', startTimestamp),
+        where('date', '<=', endTimestamp)
+      );
+      const expenseSnap = await getDocs(expenseQuery);
+      
+      let totalExpense = 0;
+      let totalIn = 0;
+      expenseSnap.forEach((doc) => {
+        const data = doc.data();
+        totalExpense += Number(data.totalCost || 0);
+        totalIn += Number(data.quantity || 0);
+      });
+
+      // Mapping hasil Map ke format ChartDataPoint[]
+      const weeklyData = Array.from(chartDataMap, ([label, value]) => ({
+        label,
+        value,
+      }));
 
       return {
         totalProducts: productsSnap.size,
-        totalTransactions: outSnap.size,
+        totalTransactions: transactionsSnap.size,
         totalRevenue,
         totalExpense,
         totalProfit: totalRevenue - totalExpense,
@@ -72,88 +117,66 @@ export class DashboardService {
         totalIn,
         totalOut,
         weeklyData,
+        stockRanking, // Data mentah untuk di-sort di UI (Tinggi/Rendah)
+        salesRanking, // Data mentah untuk di-sort di UI (Tinggi/Rendah)
       };
-    } catch (error) { 
-      throw error; 
+    } catch (error) {
+      console.error('DashboardService Error:', error);
+      throw error;
     }
   }
 
-  private static generateChartDataMap(preset: 'today' | 'week' | 'month' | 'year'): Map<string, number> {
+  /**
+   * Helper untuk inisialisasi Map data grafik berdasarkan preset
+   */
+  private static generateChartDataMap(preset: string): Map<string, number> {
     const map = new Map<string, number>();
-
-    switch (preset) {
-      case 'today':
-        // Jam: 6, 9, 12, 15, 18, 21, 24, 3
-        ['06', '09', '12', '15', '18', '21', '24', '03'].forEach(hour => {
-          map.set(hour, 0);
-        });
-        break;
-
-      case 'week':
-        // Hari: Senin - Minggu
-        const daysName = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-        const today = new Date();
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          map.set(daysName[d.getDay()], 0);
-        }
-        break;
-
-      case 'month':
-        // Minggu: Mg 1, Mg 2, Mg 3, Mg 4
-        ['Mg 1', 'Mg 2', 'Mg 3', 'Mg 4'].forEach(week => {
-          map.set(week, 0);
-        });
-        break;
-
-      case 'year':
-        // Bulan: Jan - Des
-        ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].forEach(month => {
-          map.set(month, 0);
-        });
-        break;
+    if (preset === 'today') {
+      ['06', '09', '12', '15', '18', '21', '00', '03'].forEach((h) => map.set(h, 0));
+    } else if (preset === 'month') {
+      ['Mg 1', 'Mg 2', 'Mg 3', 'Mg 4'].forEach((w) => map.set(w, 0));
+    } else if (preset === 'year') {
+      ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].forEach((m) => map.set(m, 0));
+    } else {
+      // Default: Week
+      ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((d) => map.set(d, 0));
     }
-
     return map;
   }
 
-  private static getChartKey(date: Date, preset: 'today' | 'week' | 'month' | 'year'): string {
-    switch (preset) {
-      case 'today':
-        // Group by 3-hour intervals
-        const hour = date.getHours();
-        if (hour >= 6 && hour < 9) return '06';
-        if (hour >= 9 && hour < 12) return '09';
-        if (hour >= 12 && hour < 15) return '12';
-        if (hour >= 15 && hour < 18) return '15';
-        if (hour >= 18 && hour < 21) return '18';
-        if (hour >= 21 && hour < 24) return '21';
-        if (hour >= 0 && hour < 3) return '24';
-        if (hour >= 3 && hour < 6) return '03';
-        return '06';
-
-      case 'week':
-        const daysName = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-        return daysName[date.getDay()];
-
-      case 'month':
-        // Week of month (1-4)
-        const dayOfMonth = date.getDate();
-        if (dayOfMonth <= 7) return 'Mg 1';
-        if (dayOfMonth <= 14) return 'Mg 2';
-        if (dayOfMonth <= 21) return 'Mg 3';
-        return 'Mg 4';
-
-      case 'year':
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-        return months[date.getMonth()];
-
-      default:
-        return '';
+  /**
+   * Helper untuk menentukan key (label) berdasarkan tanggal transaksi
+   */
+  private static getChartKey(date: Date, preset: string): string {
+    if (preset === 'today') {
+      const h = date.getHours();
+      if (h >= 6 && h < 9) return '06';
+      if (h >= 9 && h < 12) return '09';
+      if (h >= 12 && h < 15) return '12';
+      if (h >= 15 && h < 18) return '15';
+      if (h >= 18 && h < 21) return '18';
+      if (h >= 21 || h < 0) return '21';
+      if (h >= 0 && h < 3) return '00';
+      return '03';
     }
+    if (preset === 'month') {
+      const d = date.getDate();
+      if (d <= 7) return 'Mg 1';
+      if (d <= 14) return 'Mg 2';
+      if (d <= 21) return 'Mg 3';
+      return 'Mg 4';
+    }
+    if (preset === 'year') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return months[date.getMonth()];
+    }
+    const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    return days[date.getDay()];
   }
 
+  /**
+   * Helper untuk mendapatkan rentang tanggal berdasarkan preset
+   */
   static getPresetDateRange(preset: 'today' | 'week' | 'month' | 'year'): DateRange {
     const end = new Date();
     end.setHours(23, 59, 59, 999);
@@ -161,19 +184,27 @@ export class DashboardService {
     start.setHours(0, 0, 0, 0);
 
     if (preset === 'week') {
-      // Start from Monday of current week
       const day = start.getDay();
       const diff = start.getDate() - day + (day === 0 ? -6 : 1);
       start.setDate(diff);
     } else if (preset === 'month') {
-      // Start from first day of current month
       start.setDate(1);
     } else if (preset === 'year') {
-      // Start from January 1st of current year
       start.setMonth(0);
       start.setDate(1);
     }
-
     return { startDate: start, endDate: end };
+  }
+
+  /**
+   * Helper untuk format angka ke mata uang Rupiah
+   */
+  static formatCurrency(value: number): string {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   }
 }

@@ -14,6 +14,8 @@ export const useDashboard = () => {
     totalIn: 0, 
     totalOut: 0, 
     weeklyData: [],
+    stockRanking: [], // Array untuk progress bar stok
+    salesRanking: [], // Array untuk progress bar penjualan
   });
 
   const [dateRange, setDateRange] = useState<DateRange>(

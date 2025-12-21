@@ -12,10 +12,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { useDashboard } from '../../hooks/useDashboard';
+
+// Components
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
 import { StatsGrid } from '../../components/dashboard/StatsGrid';
 import { DashboardChart } from '../../components/dashboard/DashboardChart';
 import { DateRangeSelector } from '../../components/dashboard/DateRangeSelector';
+import { ProductRankingCard } from '../../components/dashboard/ProductRankingCard';
 
 const AdminDashboard = () => {
   const insets = useSafeAreaInsets();
@@ -75,7 +78,7 @@ const AdminDashboard = () => {
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: HEADER_MAX_HEIGHT + 12,
+          paddingTop: HEADER_MAX_HEIGHT + 4,
           paddingBottom: 100 + insets.bottom,
           paddingHorizontal: 20,
         }}
@@ -98,14 +101,12 @@ const AdminDashboard = () => {
           onSelectPreset={setPresetRange} 
         />
 
-        {/* Loading Indicator yang stabil di satu posisi */}
         <View style={styles.loadingWrapper}>
           {loading && !refreshing && (
             <ActivityIndicator size="small" color={COLORS.secondary} />
           )}
         </View>
 
-        {/* Wrapper Konten: renderToHardwareTextureAndroid mencegah border kedip abu-abu */}
         <View 
           renderToHardwareTextureAndroid={true}
           style={[
@@ -121,58 +122,57 @@ const AdminDashboard = () => {
           />
 
           <View style={styles.chartWrapper}>
-            {/* ✅ FIX: Tambahkan prop selectedPreset */}
             <DashboardChart 
               data={stats.weeklyData} 
               isLoading={loading}
               selectedPreset={selectedPreset}
             />
           </View>
-          
-          <View style={styles.demoContent}>
-            <Text style={styles.demoText}>SwiftPay Analytics Engine</Text>
+
+          {/* SECTION: DIAGRAM BATANG / PROGRESS BAR RANKING */}
+          <View style={styles.rankingSection}>
+            <ProductRankingCard 
+              title="Top 10 Penjualan Produk"
+              data={stats.salesRanking || []}
+              unit="Terjual"
+              color={COLORS.primary}
+            />
+
+            <ProductRankingCard 
+              title="Top 10 Stok Produk"
+              data={stats.stockRanking || []}
+              unit="Unit"
+              color="#3b82f6" 
+            />
           </View>
         </View>
 
-        <Text style={styles.footerBrand}>SwiftPay Ecosystem v1.0 • 2025</Text>
+        <Text style={styles.footerBrand}>Swiftstock by Efendi 2025</Text>
       </Animated.ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   loadingWrapper: { 
-    height: 30, 
+    height: 0, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    marginVertical: 4,
   },
   contentWrapper: {
-    // Memberikan minHeight mencegah layout jumping yang bikin border kedip
+    marginTop: 0,
     minHeight: 400, 
   },
   chartWrapper: {
     marginTop: 10,
-    minHeight: 220, // Sesuaikan dengan tinggi DashboardChart Anda
+    minHeight: 220,
   },
-  demoContent: {
-    height: 100, 
-    marginTop: 20, 
-    backgroundColor: '#FFF', 
-    borderRadius: 20,
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: '#eee', 
-    borderStyle: 'dashed',
-  },
-  demoText: { 
-    color: COLORS.textLight, 
-    fontSize: 12, 
-    fontFamily: 'PoppinsRegular' 
+  rankingSection: {
+    marginTop: 20,
+    paddingBottom: 20,
+    gap: 10,
   },
   footerBrand: { 
     textAlign: 'center', 

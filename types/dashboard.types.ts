@@ -1,9 +1,18 @@
-// ====================================
-// 1. types/dashboard.types.ts
-// ====================================
+// Pastikan ada kata kunci export di depan setiap interface
 export interface DateRange {
   startDate: Date;
   endDate: Date;
+}
+
+export interface ChartDataPoint {
+  value: number;
+  label: string;
+}
+
+export interface ProductStat {
+  id: string;
+  name: string;
+  value: number;
 }
 
 export interface DashboardStats {
@@ -13,13 +22,10 @@ export interface DashboardStats {
   totalExpense: number;
   totalProfit: number;
   lowStockCount: number;
-  totalIn: number;  // ✅ Konsisten dengan service
-  totalOut: number; // ✅ Konsisten dengan service
-  weeklyData: ChartDataPoint[];
-  dateRange?: DateRange; // ⚠️ Optional karena initial state
-}
-
-export interface ChartDataPoint {
-  value: number;
-  label: string;
+  totalIn: number;
+  totalOut: number;
+  weeklyData: ChartDataPoint[]; // Menggunakan interface di atas
+  dateRange?: DateRange;        // Menggunakan interface di atas
+  stockRanking: ProductStat[];
+  salesRanking: ProductStat[];
 }
