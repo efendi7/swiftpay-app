@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { Edit2, Package, AlertTriangle, TrendingUp } from 'lucide-react-native';
+import { Edit2, Package, AlertTriangle, ShoppingBag } from 'lucide-react-native';
 import { Product } from '../../types/product.types';
 
 interface ProductCardProps {
@@ -74,15 +74,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
           ]}>
             <Package size={10} color={isLowStock ? '#EF4444' : '#10B981'} />
             <Text style={[styles.stockText, { color: isLowStock ? '#EF4444' : '#10B981' }]}>
-              {product.stock}
+              {product.stock} stok
             </Text>
             {isLowStock && <AlertTriangle size={8} color="#EF4444" />}
           </View>
 
           {/* BADGE TERJUAL */}
           <View style={styles.soldBadge}>
-            <TrendingUp size={10} color="#64748B" />
-            <Text style={styles.soldText}>{product.sold || 0}</Text>
+            <ShoppingBag size={10} color="#64748B"/>
+            <Text style={styles.soldText}>{product.sold || 0} terjual</Text>
           </View>
 
           {/* TOMBOL EDIT (Icon Only) */}

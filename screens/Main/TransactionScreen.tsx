@@ -6,7 +6,7 @@ import { History, BarChart3 } from 'lucide-react-native';
 
 import { db, auth } from '../../services/firebaseConfig';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { TransactionSearchBar, TransactionFilterSection, TransactionList } from '../../components/transactions';
+import { TransactionFilterSection, TransactionList } from '../../components/transactions';
 import { FilterMode, SortType, Transaction } from '../../types/transaction.type';
 import { COLORS } from '../../constants/colors';
 
@@ -19,13 +19,14 @@ const TransactionScreen = () => {
   
   const currentUser = auth.currentUser;
 
+  // --- STATE FILTER & SEARCH ---
   const [searchInput, setSearchInput] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [selectedSort, setSelectedSort] = useState<SortType>('latest');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  // Menggunakan selectedDate (Date) alih-alih Month/Year untuk sinkronisasi dengan DatePicker
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Detect Role
+  // Detect Role (Admin/Kasir)
   useEffect(() => {
     const checkRole = async () => {
       const user = auth.currentUser;
@@ -37,7 +38,7 @@ const TransactionScreen = () => {
     checkRole();
   }, []);
 
-  // Fetch Transactions with Role Filter
+  // Fetch Data Transaksi
   const loadTransactions = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -72,10 +73,11 @@ const TransactionScreen = () => {
     loadTransactions();
   }, [loadTransactions]);
 
-  // Search and Sort Logic
+  // --- LOGIKA FILTERING & SEARCHING ---
   const filteredData = useMemo(() => {
     let filtered = [...transactions];
 
+    // 1. Pencarian
     if (searchInput.trim()) {
       const lower = searchInput.toLowerCase();
       filtered = filtered.filter(t => 
@@ -85,23 +87,25 @@ const TransactionScreen = () => {
       );
     }
 
+    // 2. Filter Waktu: Hari Ini
     if (filterMode === 'today') {
-      const today = new Date();
+      const todayStr = new Date().toDateString();
       filtered = filtered.filter(t => {
         if (!t.createdAt) return false;
-        const date = t.createdAt.toDate();
-        return date.toDateString() === today.toDateString();
+        return t.createdAt.toDate().toDateString() === todayStr;
       });
     }
 
+    // 3. Filter Waktu: Tanggal Spesifik (DatePicker)
     if (filterMode === 'specificMonth') {
+      const selectedDateStr = selectedDate.toDateString();
       filtered = filtered.filter(t => {
         if (!t.createdAt) return false;
-        const date = t.createdAt.toDate();
-        return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
+        return t.createdAt.toDate().toDateString() === selectedDateStr;
       });
     }
 
+    // 4. Sortir
     filtered.sort((a, b) => {
       const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
       const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
@@ -109,9 +113,9 @@ const TransactionScreen = () => {
     });
 
     return filtered;
-  }, [transactions, searchInput, filterMode, selectedSort, selectedMonth, selectedYear]);
+  }, [transactions, searchInput, filterMode, selectedSort, selectedDate]);
 
-  // Dynamic Header Configuration
+  // Konfigurasi UI Header
   const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
   const headerTitle = isAdmin ? `Semua Riwayat\nTransaksi` : `Riwayat Transaksi\nSaya`;
   const headerIcon = isAdmin ? <BarChart3 size={28} color="#FFF" /> : <History size={28} color="#FFF" />;
@@ -136,18 +140,17 @@ const TransactionScreen = () => {
 
       <View style={styles.contentWrapper}>
         <View style={styles.filterSearchContainer}>
-          <TransactionSearchBar value={searchInput} onChangeText={setSearchInput} isAdmin={isAdmin} />
-          
           <TransactionFilterSection
+            searchInput={searchInput}
+            onSearchChange={setSearchInput}
             filterMode={filterMode}
             selectedSort={selectedSort}
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
+            selectedDate={selectedDate} // Prop Baru
             transactionCount={filteredData.length}
+            isAdmin={isAdmin}
             onFilterChange={setFilterMode}
             onSortChange={setSelectedSort}
-            onMonthChange={setSelectedMonth}
-            onYearChange={setSelectedYear}
+            onDateChange={setSelectedDate} // Prop Baru
           />
         </View>
 
@@ -157,6 +160,7 @@ const TransactionScreen = () => {
           isAdmin={isAdmin}
           refetch={loadTransactions}
           insets={insets}
+          refreshing={refreshing}
         />
       </View>
     </View>
@@ -164,19 +168,26 @@ const TransactionScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.primary },
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.primary 
+  },
+  loaderContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: '#F8FAFC' 
+  },
   contentWrapper: { 
     flex: 1, 
     backgroundColor: '#F8FAFC', 
     borderTopLeftRadius: 30, 
     borderTopRightRadius: 30, 
     marginTop: -20, 
-    overflow: 'hidden' 
+    overflow: 'visible' // Diganti ke 'visible' agar bayangan kartu filter tidak terpotong
   },
   filterSearchContainer: { 
-    padding: 16,
-    paddingBottom: 0
+    paddingTop: 8,
   }
 });
 

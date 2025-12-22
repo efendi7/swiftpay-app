@@ -1,15 +1,17 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import Collapsible from 'react-native-collapsible';
-import { ChevronDown, ChevronUp, Filter, Calendar, TrendingUp, Clock } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Filter, Calendar, TrendingUp, Clock, Search, X } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 interface FilterProps {
   products: any[];
   searchQuery: string;
+  onSearchChange: (text: string) => void;
   filterMode: 'all' | 'today' | 'range';
   sortType: string;
+  userRole?: 'admin' | 'kasir';
   onFiltered: (filtered: any[]) => void;
   onFilterModeChange: (mode: any) => void;
   onSortChange: (sort: string) => void;
@@ -18,8 +20,10 @@ interface FilterProps {
 export const FilterSection = ({
   products,
   searchQuery,
+  onSearchChange,
   filterMode,
   sortType,
+  userRole,
   onFiltered,
   onFilterModeChange,
   onSortChange,
@@ -32,16 +36,17 @@ export const FilterSection = ({
   const applyFilters = useCallback(() => {
     let filtered = [...products];
 
-    // 1. Filter Pencarian
+    // Logika Pencarian: Mencakup Nama, Barcode, dan Kategori sekaligus
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.barcode.includes(q)
+        p.name?.toLowerCase().includes(q) || 
+        p.barcode?.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) // Kategori otomatis terfilter lewat sini
       );
     }
 
-    // 2. Filter Waktu (Berdasarkan Tanggal Dibuat)
+    // Filter Waktu
     if (filterMode === 'today') {
       const today = new Date().toDateString();
       filtered = filtered.filter(p => p.createdAt?.toDate?.().toDateString() === today);
@@ -50,23 +55,21 @@ export const FilterSection = ({
       filtered = filtered.filter(p => p.createdAt?.toDate?.().toDateString() === targetDate);
     }
 
-    // 3. Filter Status Stok (Filter Data)
+    // Filter Status Stok
     if (sortType === 'stock-safe') {
-      filtered = filtered.filter(p => p.stock > 10);
+      filtered = filtered.filter(p => (p.stock || 0) > 10);
     } else if (sortType === 'stock-critical') {
-      filtered = filtered.filter(p => p.stock > 0 && p.stock <= 10);
+      filtered = filtered.filter(p => (p.stock || 0) > 0 && (p.stock || 0) <= 10);
     } else if (sortType === 'stock-empty') {
-      filtered = filtered.filter(p => p.stock <= 0);
+      filtered = filtered.filter(p => (p.stock || 0) <= 0);
     }
 
-    // 4. Pengurutan (Sorting Logic)
+    // Sort Logic
     filtered.sort((a, b) => {
       switch (sortType) {
         case 'sold-desc': return (b.sold || 0) - (a.sold || 0);
         case 'date-desc': return (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0);
         case 'date-asc': return (a.createdAt?.toDate?.() || 0) - (b.createdAt?.toDate?.() || 0);
-        case 'stock-safe': return b.stock - a.stock;
-        case 'stock-critical': return a.stock - b.stock;
         default: return 0;
       }
     });
@@ -80,74 +83,77 @@ export const FilterSection = ({
   }, [applyFilters]);
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.toggle} 
-        onPress={() => setIsExpanded(!isExpanded)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.toggleLeft}>
-          <Filter size={18} color={COLORS.secondary} />
-          <Text style={styles.toggleText}>Filter & Urutkan</Text>
-        </View>
-        <View style={styles.toggleRight}>
-          <Text style={styles.countText}>{currentCount} Produk</Text>
-          {isExpanded ? <ChevronUp size={20} color="#94A3B8" /> : <ChevronDown size={20} color="#94A3B8" />}
-        </View>
-      </TouchableOpacity>
-
-      <Collapsible collapsed={!isExpanded}>
-        <View style={styles.filterBox}>
-          
-          {/* BAGIAN WAKTU */}
-          <Text style={styles.sectionLabel}>Waktu Produk:</Text>
-          <View style={styles.row}>
-            <TouchableOpacity 
-              style={[styles.btn, filterMode === 'today' && styles.btnActive]}
-              onPress={() => onFilterModeChange('today')}
-            >
-              <Clock size={14} color={filterMode === 'today' ? '#FFF' : COLORS.secondary} style={{marginRight: 6}}/>
-              <Text style={[styles.btnText, filterMode === 'today' && styles.btnTextActive]}>Hari Ini</Text>
+    <View style={styles.outerContainer}>
+      <View style={styles.mainCard}>
+        {/* HANYA SEARCH BAR (KATEGORI OTOMATIS LEWAT INPUT INI) */}
+        <View style={styles.searchContainer}>
+          <Search size={18} color="#94A3B8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={userRole === 'admin' ? "Cari produk, barcode, atau kategori..." : "Cari produk..."}
+            value={searchQuery}
+            onChangeText={onSearchChange}
+            placeholderTextColor="#94A3B8"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => onSearchChange('')}>
+              <X size={16} color="#94A3B8" />
             </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.btn, filterMode === 'range' && styles.btnActive]}
-              onPress={() => setDatePickerVisibility(true)}
-            >
-              <Calendar size={14} color={filterMode === 'range' ? '#FFF' : COLORS.secondary} style={{marginRight: 6}}/>
-              <Text style={[styles.btnText, filterMode === 'range' && styles.btnTextActive]}>
-                {filterMode === 'range' ? selectedDate.toLocaleDateString('id-ID') : 'Pilih Tanggal'}
-              </Text>
-            </TouchableOpacity>
-            
-            {filterMode !== 'all' && (
-               <TouchableOpacity onPress={() => onFilterModeChange('all')} style={styles.resetBtn}>
-                 <Text style={styles.resetText}>Reset</Text>
-               </TouchableOpacity>
-            )}
-          </View>
-
-          {/* BAGIAN URUTAN & STOK */}
-          <Text style={styles.sectionLabel}>Urutkan & Status Stok:</Text>
-          <View style={styles.grid}>
-            {/* Baris 1 */}
-            <SortBtn 
-              label="Terlaris" 
-              type="sold-desc" 
-              current={sortType} 
-              onSelect={onSortChange} 
-              icon={<TrendingUp size={12} color={sortType === 'sold-desc' ? '#FFF' : '#F59E0B'} />} 
-            />
-            <SortBtn label="Tgl Terbaru" type="date-desc" current={sortType} onSelect={onSortChange} />
-            <SortBtn label="Tgl Terlama" type="date-asc" current={sortType} onSelect={onSortChange} />
-
-            {/* Baris 2 */}
-            <SortBtn label="Stok Aman" type="stock-safe" current={sortType} onSelect={onSortChange} activeColor="#22C55E" />
-            <SortBtn label="Stok Kritis" type="stock-critical" current={sortType} onSelect={onSortChange} activeColor="#F59E0B" />
-            <SortBtn label="Stok Habis" type="stock-empty" current={sortType} onSelect={onSortChange} activeColor="#EF4444" />
-          </View>
+          )}
         </View>
-      </Collapsible>
+
+        <View style={styles.divider} />
+
+        {/* TOMBOL TOGGLE FILTER (UNTUK WAKTU & SORTIR) */}
+        <TouchableOpacity 
+          style={styles.toggle} 
+          onPress={() => setIsExpanded(!isExpanded)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.toggleLeft}>
+            <Filter size={18} color={COLORS.secondary} />
+            <Text style={styles.toggleText}>Filter Lanjutan</Text>
+          </View>
+          <View style={styles.toggleRight}>
+            <Text style={styles.countText}>{currentCount} Item</Text>
+            {isExpanded ? <ChevronUp size={18} color="#94A3B8" /> : <ChevronDown size={18} color="#94A3B8" />}
+          </View>
+        </TouchableOpacity>
+
+        <Collapsible collapsed={!isExpanded}>
+          <View style={styles.filterBox}>
+            <Text style={styles.sectionLabel}>Waktu</Text>
+            <View style={styles.row}>
+              <TouchableOpacity 
+                style={[styles.btn, filterMode === 'today' && styles.btnActive]}
+                onPress={() => onFilterModeChange('today')}
+              >
+                <Clock size={14} color={filterMode === 'today' ? '#FFF' : COLORS.secondary} style={{marginRight: 6}}/>
+                <Text style={[styles.btnText, filterMode === 'today' && styles.btnTextActive]}>Hari Ini</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.btn, filterMode === 'range' && styles.btnActive]}
+                onPress={() => setDatePickerVisibility(true)}
+              >
+                <Text style={[styles.btnText, filterMode === 'range' && styles.btnTextActive]}>Pilih Tanggal</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.sectionLabel}>Stok & Urutan</Text>
+            <View style={styles.gridContainer}>
+              <View style={styles.gridRow}>
+                <SortBtn label="Terlaris" type="sold-desc" current={sortType} onSelect={onSortChange} icon={<TrendingUp size={12} color={sortType === 'sold-desc' ? '#FFF' : '#F59E0B'} />} />
+                <SortBtn label="Terbaru" type="date-desc" current={sortType} onSelect={onSortChange} />
+              </View>
+              <View style={styles.gridRow}>
+                <SortBtn label="Aman" type="stock-safe" current={sortType} onSelect={onSortChange} activeColor="#22C55E" />
+                <SortBtn label="Kritis" type="stock-critical" current={sortType} onSelect={onSortChange} activeColor="#F59E0B" />
+                <SortBtn label="Habis" type="stock-empty" current={sortType} onSelect={onSortChange} activeColor="#EF4444" />
+              </View>
+            </View>
+          </View>
+        </Collapsible>
+      </View>
 
       <DateTimePickerModal
         isVisible={isDatePickerVisible}
@@ -163,7 +169,6 @@ export const FilterSection = ({
   );
 };
 
-// Komponen Tombol Internal
 const SortBtn = ({ label, type, current, onSelect, icon, activeColor }: any) => {
   const isActive = current === type;
   const backgroundColor = isActive ? (activeColor || COLORS.secondary) : '#F8FAFC';
@@ -176,31 +181,50 @@ const SortBtn = ({ label, type, current, onSelect, icon, activeColor }: any) => 
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         {icon}
-        <Text style={[styles.gridText, isActive && { color: '#FFF', fontFamily: 'PoppinsBold' }]}>{label}</Text>
+        <Text numberOfLines={1} style={[styles.gridText, isActive && { color: '#FFF', fontFamily: 'PoppinsBold' }]}>{label}</Text>
       </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: '#FFF', borderBottomWidth: 1, borderColor: '#F1F5F9' },
-  toggle: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center' },
+  outerContainer: { paddingHorizontal: 16, paddingVertical: 10 },
+  mainCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 54, // Tinggi lebih lega untuk search bar utama
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: 'PoppinsRegular',
+    fontSize: 14,
+    color: '#1E293B',
+  },
+  divider: { height: 1, backgroundColor: '#F1F5F9' },
+  toggle: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, alignItems: 'center' },
   toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toggleRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  toggleText: { fontFamily: 'PoppinsSemiBold', fontSize: 14, color: '#1E293B' },
-  countText: { color: '#64748B', fontSize: 12, fontFamily: 'PoppinsMedium' },
-  filterBox: { paddingHorizontal: 16, paddingBottom: 20, paddingTop: 5 },
-  sectionLabel: { fontSize: 11, fontFamily: 'PoppinsMedium', color: '#94A3B8', marginBottom: 8, marginTop: 12, marginLeft: 4 },
-  row: { flexDirection: 'row', gap: 8, marginBottom: 5, alignItems: 'center' },
-  btn: { flex: 1, flexDirection: 'row', paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  toggleText: { fontFamily: 'PoppinsSemiBold', fontSize: 13, color: '#475569' },
+  countText: { color: COLORS.secondary, fontSize: 11, fontFamily: 'PoppinsBold' },
+  filterBox: { paddingHorizontal: 16, paddingBottom: 16 },
+  sectionLabel: { fontSize: 10, fontFamily: 'PoppinsBold', color: '#CBD5E1', marginBottom: 6, marginTop: 10, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', gap: 6 },
+  btn: { flex: 1, flexDirection: 'row', paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   btnActive: { backgroundColor: COLORS.secondary, borderColor: COLORS.secondary },
-  btnText: { fontSize: 12, fontFamily: 'PoppinsSemiBold', color: '#64748B' },
+  btnText: { fontSize: 11, fontFamily: 'PoppinsSemiBold', color: '#64748B' },
   btnTextActive: { color: '#FFF' },
-  resetBtn: { paddingHorizontal: 8 },
-  resetText: { color: '#EF4444', fontSize: 12, fontFamily: 'PoppinsBold' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridItem: { width: '31.5%', paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  gridText: { fontSize: 10, fontFamily: 'PoppinsMedium', color: '#64748B', textAlign: 'center' }
+  gridContainer: { gap: 6 },
+  gridRow: { flexDirection: 'row', gap: 6 },
+  gridItem: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  gridText: { fontSize: 10, fontFamily: 'PoppinsMedium', color: '#64748B' }
 });
 
 export default FilterSection;

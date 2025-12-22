@@ -1,246 +1,202 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import Collapsible from 'react-native-collapsible';
-import { ChevronDown, ChevronUp, Clock, Calendar, Filter } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Clock, Calendar, Filter, Search, X } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
-import MonthPicker from '../products/MonthPicker';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { FilterMode, SortType } from '../../types/transaction.type';
 
 interface Props {
+  searchInput: string;
+  onSearchChange: (text: string) => void;
   filterMode: FilterMode;
   selectedSort: SortType;
-  selectedMonth: number;
-  selectedYear: number;
+  selectedDate: Date; // Tambahkan ini di props (kirim dari Screen)
   transactionCount: number;
+  isAdmin: boolean;
   onFilterChange: (mode: FilterMode) => void;
   onSortChange: (sort: SortType) => void;
-  onMonthChange: (month: number) => void;
-  onYearChange: (year: number) => void;
+  onDateChange: (date: Date) => void; // Tambahkan ini untuk handle ganti tanggal
 }
 
 const TransactionFilterSection: React.FC<Props> = ({
+  searchInput,
+  onSearchChange,
   filterMode,
   selectedSort,
-  selectedMonth,
-  selectedYear,
+  selectedDate,
   transactionCount,
+  isAdmin,
   onFilterChange,
   onSortChange,
-  onMonthChange,
-  onYearChange,
+  onDateChange,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
   return (
-    <View style={styles.container}>
-      {/* TOGGLE HEADER */}
-      <TouchableOpacity
-        style={styles.toggle}
-        onPress={() => setIsExpanded(!isExpanded)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.toggleLeft}>
-          <Filter size={18} color={COLORS.secondary} />
-          <Text style={styles.toggleText}>Filter & Urutkan</Text>
-        </View>
-
-        <View style={styles.toggleRight}>
-          <Text style={styles.countText}>{transactionCount} Transaksi</Text>
-          {isExpanded ? (
-            <ChevronUp size={20} color="#94A3B8" />
-          ) : (
-            <ChevronDown size={20} color="#94A3B8" />
+    <View style={styles.outerContainer}>
+      <View style={styles.mainCard}>
+        {/* SEARCH SECTION */}
+        <View style={styles.searchContainer}>
+          <Search size={18} color="#94A3B8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={isAdmin ? "Cari No. TRX atau Kasir..." : "Cari No. Transaksi..."}
+            value={searchInput}
+            onChangeText={onSearchChange}
+            placeholderTextColor="#94A3B8"
+          />
+          {searchInput.length > 0 && (
+            <TouchableOpacity onPress={() => onSearchChange('')}>
+              <X size={16} color="#94A3B8" />
+            </TouchableOpacity>
           )}
         </View>
-      </TouchableOpacity>
 
-      {/* CONTENT */}
-      <Collapsible collapsed={!isExpanded} duration={300}>
-        <View style={styles.filterBox}>
-          {/* TIME FILTER */}
-          <View style={styles.row}>
-            <FilterButton
-              label="Hari Ini"
-            
-              active={filterMode === 'today'}
-              onPress={() => onFilterChange('today')}
-            />
-            <FilterButton
-              label="Pilih Bulan"
-             
-              active={filterMode === 'specificMonth'}
-              onPress={() => onFilterChange('specificMonth')}
-            />
+        <View style={styles.divider} />
+
+        {/* TOGGLE HEADER */}
+        <TouchableOpacity
+          style={styles.toggle}
+          onPress={() => setIsExpanded(!isExpanded)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.toggleLeft}>
+            <Filter size={18} color={COLORS.secondary} />
+            <Text style={styles.toggleText}>Filter Lanjutan</Text>
           </View>
 
-          {/* MONTH PICKER */}
-          <Collapsible collapsed={filterMode !== 'specificMonth'} duration={300}>
-            <View style={styles.monthPickerWrapper}>
-              <MonthPicker
-                selectedMonth={selectedMonth}
-                selectedYear={selectedYear}
-                onMonthChange={onMonthChange}
-                onYearChange={onYearChange}
+          <View style={styles.toggleRight}>
+            <Text style={styles.countText}>{transactionCount} Transaksi</Text>
+            {isExpanded ? <ChevronUp size={18} color="#94A3B8" /> : <ChevronDown size={18} color="#94A3B8" />}
+          </View>
+        </TouchableOpacity>
+
+        <Collapsible collapsed={!isExpanded} duration={300}>
+          <View style={styles.filterBox}>
+            <Text style={styles.sectionLabel}>Waktu</Text>
+            <View style={styles.row}>
+              <FilterButton
+                label="Semua"
+                active={filterMode === 'all'}
+                onPress={() => onFilterChange('all')}
+              />
+              <FilterButton
+                label="Hari Ini"
+                icon={<Clock size={14} color={filterMode === 'today' ? '#FFF' : COLORS.secondary} />}
+                active={filterMode === 'today'}
+                onPress={() => onFilterChange('today')}
+              />
+              <FilterButton
+                label={filterMode === 'specificMonth' ? selectedDate.toLocaleDateString('id-ID') : "Pilih Tanggal"}
+                icon={<Calendar size={14} color={filterMode === 'specificMonth' ? '#FFF' : COLORS.secondary} />}
+                active={filterMode === 'specificMonth'}
+                onPress={() => setDatePickerVisibility(true)}
               />
             </View>
-          </Collapsible>
 
-          {/* SORT */}
-          
-          <View style={styles.row}>
-            <SortButton
-              label="Terbaru"
-              active={selectedSort === 'latest'}
-              onPress={() => onSortChange('latest')}
-            />
-            <SortButton
-              label="Terlama"
-              active={selectedSort === 'oldest'}
-              onPress={() => onSortChange('oldest')}
-            />
+            <Text style={styles.sectionLabel}>Urutan</Text>
+            <View style={styles.row}>
+              <SortButton
+                label="Terbaru"
+                active={selectedSort === 'latest'}
+                onPress={() => onSortChange('latest')}
+              />
+              <SortButton
+                label="Terlama"
+                active={selectedSort === 'oldest'}
+                onPress={() => onSortChange('oldest')}
+              />
+            </View>
           </View>
-        </View>
-      </Collapsible>
+        </Collapsible>
+      </View>
+
+      <DateTimePickerModal
+        isVisible={isDatePickerVisible}
+        mode="date"
+        onConfirm={(date: Date) => {
+          onDateChange(date);
+          onFilterChange('specificMonth'); // Kita gunakan mode ini untuk range tanggal
+          setDatePickerVisibility(false);
+        }}
+        onCancel={() => setDatePickerVisibility(false)}
+      />
     </View>
   );
 };
 
-/* ================= BUTTONS ================= */
-
-/* ================= BUTTONS ================= */
-
 const FilterButton = ({ label, icon, active, onPress }: any) => (
   <TouchableOpacity
-    // DIUBAH: Gunakan activeSecondary agar sama dengan tombol Sort (Terbaru)
-    style={[styles.filterBtn, active && styles.activeSecondary]} 
+    style={[styles.btn, active && styles.btnActive]}
     onPress={onPress}
     activeOpacity={0.7}
   >
-    {icon}
-    <Text style={[styles.filterText, active && styles.textWhite]}>
-      {label}
-    </Text>
+    {icon && <View style={{ marginRight: 6 }}>{icon}</View>}
+    <Text style={[styles.btnText, active && styles.btnTextActive]}>{label}</Text>
   </TouchableOpacity>
 );
 
 const SortButton = ({ label, active, onPress }: any) => (
   <TouchableOpacity
-    // Tetap gunakan activeSecondary
-    style={[styles.sortBtn, active && styles.activeSecondary]}
+    style={[styles.btn, active && styles.btnActive]}
     onPress={onPress}
     activeOpacity={0.7}
   >
-    <Text style={[styles.sortText, active && styles.textWhite]}>
-      {label}
-    </Text>
+    <Text style={[styles.btnText, active && styles.btnTextActive]}>{label}</Text>
   </TouchableOpacity>
 );
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: { paddingHorizontal: 16, paddingVertical: 10 },
+  mainCard: {
     backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderColor: '#F1F5F9',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-
-  toggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-  },
-  toggleLeft: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 16,
+    height: 54,
+    gap: 10,
   },
-  toggleRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  toggleText: {
-    fontFamily: 'PoppinsSemiBold',
+  searchInput: {
+    flex: 1,
+    fontFamily: 'PoppinsRegular',
     fontSize: 14,
     color: '#1E293B',
   },
-  countText: {
-    fontFamily: 'PoppinsMedium',
-    fontSize: 12,
-    color: '#64748B',
-  },
-
-  filterBox: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-
-  row: {
+  divider: { height: 1, backgroundColor: '#F1F5F9' },
+  toggle: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    padding: 14,
+    alignItems: 'center',
   },
-
-  filterBtn: {
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toggleRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  toggleText: { fontFamily: 'PoppinsSemiBold', fontSize: 13, color: '#475569' },
+  countText: { color: COLORS.secondary, fontSize: 11, fontFamily: 'PoppinsBold' },
+  filterBox: { paddingHorizontal: 16, paddingBottom: 16 },
+  sectionLabel: { fontSize: 10, fontFamily: 'PoppinsBold', color: '#CBD5E1', marginBottom: 6, marginTop: 10, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', gap: 6 },
+  btn: {
     flex: 1,
-    height: 46,
     flexDirection: 'row',
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  filterText: {
-    fontFamily: 'PoppinsSemiBold',
-    fontSize: 13,
-    color: '#64748B',
-  },
-
-  monthPickerWrapper: {
-    marginBottom: 14,
-    padding: 10,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-  },
-
-  sectionLabel: {
-    fontFamily: 'PoppinsBold',
-    fontSize: 11,
-    color: '#94A3B8',
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-
-  sortBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sortText: {
-    fontFamily: 'PoppinsMedium',
-    fontSize: 13,
-    color: '#64748B',
-  },
-
-  activePrimary: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  activeSecondary: {
-    backgroundColor: COLORS.secondary,
-    borderColor: COLORS.secondary,
-  },
-  textWhite: {
-    color: '#FFF',
-  },
+  btnActive: { backgroundColor: COLORS.secondary, borderColor: COLORS.secondary },
+  btnText: { fontSize: 11, fontFamily: 'PoppinsSemiBold', color: '#64748B' },
+  btnTextActive: { color: '#FFF' },
 });
 
 export default TransactionFilterSection;

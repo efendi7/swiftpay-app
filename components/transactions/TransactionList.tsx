@@ -9,10 +9,16 @@ interface Props {
   isAdmin: boolean;
   refetch: () => void;
   insets: { bottom: number };
+  refreshing: boolean; // Tambahkan prop ini
 }
 
 export const TransactionList: React.FC<Props> = ({
-  transactions, searchInput, isAdmin, refetch, insets,
+  transactions, 
+  searchInput, 
+  isAdmin, 
+  refetch, 
+  insets,
+  refreshing // Terima prop refreshing
 }) => {
   return (
     <FlatList
@@ -31,7 +37,7 @@ export const TransactionList: React.FC<Props> = ({
         </View>
       }
       onRefresh={refetch}
-      refreshing={false}
+      refreshing={refreshing} // Gunakan status refreshing dari screen
       showsVerticalScrollIndicator={false}
     />
   );
