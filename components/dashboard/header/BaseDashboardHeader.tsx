@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, StyleSheet, Animated, Alert } from 'react-native';
+import { View, StyleSheet, Animated, Alert, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../../services/firebaseConfig';
@@ -8,6 +8,10 @@ import { DashboardService } from '../../../services/dashboardService';
 import { HeaderUserInfo } from './HeaderUserInfo';
 import { HeaderActions } from './HeaderActions';
 
+// Definisi Tipe untuk Props Fungsi Render
+export type RenderFormatFn = (val: number) => string;
+export type RenderDetailFn = (label: string, value: number) => void;
+
 interface BaseDashboardHeaderProps {
   headerHeight: Animated.AnimatedInterpolation<number | string>;
   contentOpacity: Animated.AnimatedInterpolation<number | string>;
@@ -15,9 +19,26 @@ interface BaseDashboardHeaderProps {
   role: string;
   displayName: string;
   renderNotificationButton?: () => ReactNode;
-  renderMainCard: (format: (v: number) => string, showDetail: (l: string, v: number) => void) => ReactNode;
-  renderBottomStats: (format: (v: number) => string, showDetail: (l: string, v: number) => void) => ReactNode;
+  renderMainCard: (format: RenderFormatFn, showDetail: RenderDetailFn) => ReactNode;
+  renderBottomStats: (format: RenderFormatFn, showDetail: RenderDetailFn) => ReactNode;
 }
+
+export const sharedHeaderStyles = StyleSheet.create({
+  profitCard: { 
+    marginTop: 10, backgroundColor: 'rgba(255,255,255,0.15)', 
+    borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, 
+    flexDirection: 'row', alignItems: 'center' 
+  },
+  bottomStats: { marginTop: 12, flexDirection: 'row', gap: 8 },
+  bottomCardCompact: { 
+    flex: 1, flexDirection: 'row', alignItems: 'center', 
+    backgroundColor: 'rgba(255,255,255,0.12)', paddingVertical: 8, 
+    paddingHorizontal: 10, borderRadius: 14 
+  },
+  iconBox: { width: 26, height: 26, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  bottomLabel: { fontSize: 9, color: '#FFF', opacity: 0.8, fontFamily: 'PoppinsRegular' },
+  bottomValue: { fontSize: 11, color: '#FFF', fontFamily: 'PoppinsBold' },
+});
 
 export const BaseDashboardHeader: React.FC<BaseDashboardHeaderProps> = ({
   headerHeight, contentOpacity, topPadding, role, displayName,
@@ -27,7 +48,6 @@ export const BaseDashboardHeader: React.FC<BaseDashboardHeaderProps> = ({
   const formatValue = (val: number) => {
     const absVal = Math.abs(val);
     let result = absVal >= 1000000 ? `Rp ${(absVal / 1000000).toFixed(1)} jt` : DashboardService.formatCurrency(absVal);
-    // Tambahkan logika ribuan/milyaran jika perlu sesuai kode asli Anda
     return val < 0 ? `-${result}` : result;
   };
 

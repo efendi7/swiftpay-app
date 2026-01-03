@@ -1,54 +1,50 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { 
-  View, Text, StyleSheet, Animated, StatusBar, ActivityIndicator, 
-  RefreshControl, Modal, ScrollView, TouchableOpacity 
+  View, 
+  Text, 
+  StyleSheet, 
+  Animated, 
+  StatusBar, 
+  ActivityIndicator, 
+  RefreshControl 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { X } from 'lucide-react-native'; 
+
+// Constants & Config
 import { COLORS } from '../../../../constants/colors';
 import { auth } from '../../../../services/firebaseConfig';
 import { useDashboard } from '../../../../hooks/useDashboard'; 
 
-// Components
+// Sections
 import { CashierDashboardHeader } from './sections/CashierDashboardHeader';
 import { CashierStatsGrid } from './sections/CashierStatsGrid';
 import { CashierDashboardChart } from './sections/CashierDashboardChart';
 import { CashierSalesRanking, CashierStockRanking } from './sections/CashierRankings';
-import { CashierActivity } from './sections/CashierActivity'; // Gunakan komponen yang sudah difilter
+import { CashierActivity } from './sections/CashierActivity'; 
+
+// Modal (Gunakan ActivityModal yang sudah mendukung Infinite Scroll)
+import { ActivityModal } from '../admin/modal/ActivityModal'; 
 
 const CashierDashboard = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   
+  // Hook Dashboard untuk data statistik dan aktivitas real-time
   const { loading, stats, activities, refreshData } = useDashboard();
 
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   
-  // Ambil nama user secara dinamis dari Auth
+  // Ambil nama user secara dinamis
   const [currentDisplayName, setCurrentDisplayName] = useState(
     auth.currentUser?.displayName || 'Kasir Swiftstock'
   );
 
+  // --- LOGIKA ANIMASI HEADER ---
   const scrollY = useRef(new Animated.Value(0)).current;
   const HEADER_MAX_HEIGHT = 240 + insets.top;
   const HEADER_MIN_HEIGHT = 75 + insets.top;
-
-  useFocusEffect(
-    useCallback(() => {
-      refreshData();
-      if (auth.currentUser?.displayName) {
-        setCurrentDisplayName(auth.currentUser.displayName);
-      }
-    }, [refreshData])
-  );
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refreshData();
-    setRefreshing(false);
-  }, [refreshData]);
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 140], 
@@ -62,10 +58,30 @@ const CashierDashboard = () => {
     extrapolate: 'clamp',
   });
 
+  // --- SIDE EFFECTS ---
+  useFocusEffect(
+    useCallback(() => {
+      refreshData();
+      if (auth.currentUser?.displayName) {
+        setCurrentDisplayName(auth.currentUser.displayName);
+      }
+    }, [refreshData])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshData();
+    if (auth.currentUser?.displayName) {
+      setCurrentDisplayName(auth.currentUser.displayName);
+    }
+    setRefreshing(false);
+  }, [refreshData]);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
+      {/* HEADER ANIMASI */}
       <CashierDashboardHeader
         headerHeight={headerHeight}
         contentOpacity={contentOpacity}
@@ -84,7 +100,10 @@ const CashierDashboard = () => {
           paddingBottom: 100 + insets.bottom, 
           paddingHorizontal: 20 
         }}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }], 
+          { useNativeDriver: false }
+        )}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl 
@@ -95,17 +114,22 @@ const CashierDashboard = () => {
           />
         }
       >
+        {/* INDICATOR LOADING */}
         <View style={styles.loadingWrapper}>
-          {loading && !refreshing && <ActivityIndicator size="small" color={COLORS.secondary} />}
+          {loading && !refreshing && (
+            <ActivityIndicator size="small" color={COLORS.secondary} />
+          )}
         </View>
 
         <View style={styles.contentWrapper}>
+          {/* GRID STATISTIK */}
           <CashierStatsGrid
             totalProducts={stats.totalProducts}
             totalOut={stats.totalOut} 
             dateLabel="Hari ini"
           />
 
+          {/* CHART PENJUALAN */}
           <View style={styles.chartWrapper}>
             <CashierDashboardChart
               data={stats.weeklyData} 
@@ -114,8 +138,8 @@ const CashierDashboard = () => {
             />
           </View>
 
+          {/* RANKING & AKTIVITAS PREVIEW */}
           <View style={styles.rankingSection}>
-            {/* PERBAIKAN: Hanya kirim data dan onSeeMore agar tidak error IntrinsicAttributes */}
             <CashierSalesRanking
               data={stats.salesRanking || []} 
               onSeeMore={() => navigation.navigate('Product', { filterType: 'sold-desc' })}
@@ -126,55 +150,60 @@ const CashierDashboard = () => {
               onSeeMore={() => navigation.navigate('Inventory')}
             />
 
-            {/* PERBAIKAN: Gunakan CashierActivity untuk handle logika filter "Anda" dan "Admin" */}
+            {/* CARD AKTIVITAS: Hanya preview 5 data. 
+                Tombol 'Lihat Selengkapnya' akan membuka ActivityModal */}
             <CashierActivity 
-              activities={activities} 
+              activities={activities.slice(0, 5)} 
               currentUserName={currentDisplayName}
               onSeeMore={() => setModalVisible(true)} 
             />
           </View>
         </View>
 
-        <Text style={styles.footerBrand}>Swiftstock by Efendi • 2025</Text>
+        <Text style={styles.footerBrand}>Swiftstock by Efendi • 2026</Text>
       </Animated.ScrollView>
 
-      {/* MODAL RIWAYAT LENGKAP KASIR */}
-      <Modal animationType="slide" transparent visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingTop: insets.top + 20 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Riwayat Aktivitas</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color={COLORS.textDark} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ padding: 20 }}>
-                {/* Gunakan komponen yang sama di dalam modal */}
-                <CashierActivity 
-                  activities={activities} 
-                  currentUserName={currentDisplayName}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {/* MODAL RIWAYAT LENGKAP: 
+          Sudah menggunakan FlatList + Infinite Scroll (Pagination) */}
+      <ActivityModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        currentUserName={currentDisplayName}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  loadingWrapper: { height: 10, justifyContent: 'center', alignItems: 'center', marginVertical: 4 },
-  contentWrapper: { marginTop: 0 },
-  chartWrapper: { marginTop: 10, minHeight: 220 },
-  rankingSection: { marginTop: 20, paddingBottom: 20, gap: 15 },
-  footerBrand: { textAlign: 'center', color: COLORS.textLight, fontSize: 11, marginTop: 40, fontFamily: 'PoppinsRegular' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: COLORS.background, borderTopLeftRadius: 30, borderTopRightRadius: 30, height: '85%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  modalTitle: { fontSize: 18, fontFamily: 'PoppinsBold', color: COLORS.textDark },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background 
+  },
+  loadingWrapper: { 
+    height: 10, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    marginVertical: 4 
+  },
+  contentWrapper: { 
+    marginTop: 0 
+  },
+  chartWrapper: { 
+    marginTop: 10, 
+    minHeight: 220 
+  },
+  rankingSection: { 
+    marginTop: 20, 
+    paddingBottom: 20, 
+    gap: 15 
+  },
+  footerBrand: { 
+    textAlign: 'center', 
+    color: COLORS.textLight, 
+    fontSize: 11, 
+    marginTop: 40, 
+    fontFamily: 'PoppinsRegular' 
+  },
 });
 
 export default CashierDashboard;

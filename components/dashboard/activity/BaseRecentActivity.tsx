@@ -1,67 +1,142 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../../../constants/colors';
 import { Activity } from '../../../types/activity';
 import { ActivityHeader } from './ActivityHeader';
 import { ActivityItem } from './ActivityItem';
+import { BaseCard } from '../../ui/BaseCard';
+import { DashboardService } from '../../../services/dashboardService';
 
 interface BaseRecentActivityProps {
   activities: Activity[];
   onSeeMore?: () => void;
   title?: string;
   currentUserName: string;
+  userRole: string; // 1. Tambahkan prop ini
 }
 
-export const BaseRecentActivity: React.FC<BaseRecentActivityProps> = ({ 
-  activities, 
+export const BaseRecentActivity: React.FC<BaseRecentActivityProps> = ({
+  activities,
   onSeeMore,
-  title = "Aktivitas Terbaru",
-  currentUserName
+  title = 'Aktivitas Terbaru',
+  currentUserName,
+  userRole, // 2. Ambil dari props
 }) => {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(prev => prev + 1);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 3. Definisikan fungsi handleClear di sini
+  const handleClear = () => {
+    Alert.alert(
+      "Hapus Riwayat",
+      "Apakah Anda yakin ingin menghapus semua log aktivitas?",
+      [
+        { text: "Batal", style: "cancel" },
+        { 
+          text: "Hapus", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              await DashboardService.clearAllActivities();
+              Alert.alert("Berhasil", "Log aktivitas telah dibersihkan.");
+            } catch (error) {
+              Alert.alert("Gagal", "Terjadi kesalahan saat menghapus log.");
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   const hasActivities = activities.length > 0;
   const limitedActivities = activities.slice(0, 5);
 
   return (
-    <View style={styles.card}>
-      {/* Dipanggil di sini, jadi tidak perlu diimpor lagi di AdminActivity */}
+    <BaseCard variant="ultraSoft" style={styles.card}>
+      {/* 4. Kirimkan prop yang dibutuhkan ke ActivityHeader */}
       <ActivityHeader 
         title={title} 
-        onSeeMore={onSeeMore} 
-        hasData={hasActivities} 
+        showClear={userRole === 'admin' && hasActivities} 
+        onClear={handleClear} 
       />
 
       {!hasActivities ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Belum ada aktivitas periode ini</Text>
+          <Text style={styles.emptyText}>
+            Belum ada aktivitas periode ini
+          </Text>
         </View>
       ) : (
-        <View style={styles.activitiesList}>
-          {limitedActivities.map((activity, index) => (
-            <ActivityItem 
-              key={activity.id || index}
-              activity={activity}
-              isLast={index === limitedActivities.length - 1}
-              currentUserName={currentUserName}
-            />
-          ))}
-        </View>
+        <>
+          <View style={styles.activitiesList}>
+            {limitedActivities.map((activity, index) => {
+              const liveTime = activity.createdAt 
+                ? DashboardService.formatRelativeTime(activity.createdAt.toDate()) 
+                : 'Baru saja';
+
+              return (
+                <ActivityItem
+                  key={activity.id || index}
+                  activity={{ ...activity, time: liveTime }}
+                  isLast={index === limitedActivities.length - 1}
+                  currentUserName={currentUserName}
+                />
+              );
+            })}
+          </View>
+
+          {onSeeMore && (
+            <TouchableOpacity
+              style={styles.seeMoreBtn}
+              onPress={onSeeMore}
+            >
+              <Text style={styles.seeMoreText}>Lihat Selengkapnya</Text>
+              <ChevronRight size={14} color={COLORS.primary} />
+            </TouchableOpacity>
+          )}
+        </>
       )}
-    </View>
+    </BaseCard>
   );
 };
 
 const styles = StyleSheet.create({
   card: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 20,
-    elevation: 3,
-    shadowColor: '#000', 
-    shadowOpacity: 0.05, 
-    shadowRadius: 5 
+    padding: 18, 
+    marginBottom: 20 
   },
-  activitiesList: { gap: 0 },
-  emptyContainer: { paddingVertical: 20, alignItems: 'center' },
-  emptyText: { color: COLORS.textLight, fontSize: 12, fontFamily: 'PoppinsRegular' },
+  activitiesList: { 
+    gap: 0 
+  },
+  emptyContainer: { 
+    paddingVertical: 20, 
+    alignItems: 'center' 
+  },
+  emptyText: { 
+    color: COLORS.textLight, 
+    fontSize: 12, 
+    fontFamily: 'PoppinsRegular' 
+  },
+  seeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F2F2F2',
+  },
+  seeMoreText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontFamily: 'PoppinsMedium',
+    marginRight: 4,
+  },
 });

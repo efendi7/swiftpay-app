@@ -7,7 +7,7 @@ export const CashierDashboardChart: React.FC<BaseChartProps> = (props) => {
     <BaseDashboardChart 
       {...props}
       title="Tren Penjualan Saya"
-      accentColor={COLORS.primary} // Kasir menggunakan warna primary
+      accentColor={COLORS.secondary} // Kasir menggunakan warna primary
     />
   );
 };

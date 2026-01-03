@@ -165,7 +165,7 @@ const AdminDashboard = () => {
 
           <View style={styles.rankingSection}>
             <AdminSalesRanking 
-              title="Produk Terlaris Hari Ini" 
+              title="Produk Terlaris" 
               data={stats.salesRanking || []} 
               unit="Terjual" 
               color={COLORS.secondary} 

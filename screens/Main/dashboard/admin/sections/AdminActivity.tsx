@@ -20,7 +20,8 @@ export const AdminActivity: React.FC<AdminActivityProps> = ({
         activities={activities} // ✅ Hanya 5 aktivitas untuk preview
         currentUserName={currentUserName}
         title="Log Aktivitas Toko"
-        onSeeMore={onSeeMore} // ✅ Handler untuk buka modal
+        onSeeMore={onSeeMore} 
+        userRole="admin" // Kirimkan role sebagai "admin"
       />
     </View>
   );

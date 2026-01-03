@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native'; // Ganti SafeAreaView & ScrollView dengan View biasa
+import { View } from 'react-native';
 import { BaseRecentActivity } from '../../../../../components/dashboard/activity/BaseRecentActivity';
 import { Activity } from '../../../../../types/activity';
 import { useNavigation } from '@react-navigation/native';
@@ -11,42 +11,47 @@ interface CashierActivityProps {
 }
 
 export const CashierActivity: React.FC<CashierActivityProps> = ({ 
-  activities: propsActivities, 
-  currentUserName: propsUserName,
+  activities: propsActivities = [], 
+  currentUserName = "Kasir",
   onSeeMore 
 }) => {
-  const navigation = useNavigation();
   const [activities, setActivities] = useState<Activity[]>([]);
-  const userData = { name: propsUserName || "Kasir 1" }; 
 
   useEffect(() => {
-    if (propsActivities && propsActivities.length > 0) {
-      const filtered = propsActivities.filter(item => 
-        item.userName === userData.name || item.userName === 'Admin'
-      );
-      setActivities(filtered);
-    } else {
-      const rawData: Activity[] = [
-        { id: '1', type: 'OUT', message: 'Kasir Checkout total 2 produk "Kopi"', userName: 'Kasir 1', time: '10:00' },
-        { id: '2', type: 'IN', message: 'Stok Masuk: 50 unit "Susu UHT"', userName: 'Admin', time: '09:00' },
-      ];
-      const filtered = rawData.filter(item => 
-        item.userName === userData.name || item.userName === 'Admin'
-      );
-      setActivities(filtered);
+    // 1. Pastikan kita punya data untuk difilter
+    if (!propsActivities || propsActivities.length === 0) {
+        setActivities([]);
+        return;
     }
-  }, [propsActivities, userData.name]);
+
+    const filtered = propsActivities.filter(item => {
+      // Normalisasi teks agar tidak sensitif huruf besar/kecil
+      const type = item.type?.toUpperCase() || '';
+      const userName = item.userName?.toLowerCase() || '';
+      const me = currentUserName.toLowerCase();
+
+      // LOGIKA FILTER:
+      // - Munculkan jika itu aktivitas SAYA
+      const isMine = userName === me;
+      // - Munculkan jika dilakukan ADMIN (Logika: mengandung kata 'admin')
+      const isAdmin = userName.includes('admin');
+      // - Munculkan jika tipenya adalah stok masuk (IN atau MASUK)
+      const isStockIn = type === 'IN' || type === 'MASUK' || type === 'TAMBAH';
+
+      return isMine || isAdmin || isStockIn;
+    });
+
+    setActivities(filtered);
+  }, [propsActivities, currentUserName]);
 
   return (
-    /* Gunakan View dengan width 100% tanpa padding/margin tambahan 
-       agar sinkron dengan AdminActivity 
-    */
     <View style={{ width: '100%' }}>
       <BaseRecentActivity
         activities={activities} 
-        currentUserName={userData.name} 
+        currentUserName={currentUserName} 
         title="Aktivitas Saya & Toko"
-        onSeeMore={onSeeMore || (() => navigation.navigate('History' as never))}
+        onSeeMore={onSeeMore}
+        userRole="kasir"
       />
     </View>
   );

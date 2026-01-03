@@ -14,46 +14,46 @@ export const ActivityItem = memo(({ activity, isLast, currentUserName }: Activit
   const isMe = activity.userName === currentUserName;
   const displayName = isMe ? 'Anda' : activity.userName;
   const title = getActivityTitle(activity.type, activity.message);
+  const messageParts = formatActivityMessage(activity.message);
 
-  const getTitleStyle = () => {
-    // BIRU untuk Produk Baru
-    if (title === 'PRODUK BARU') {
-      return { color: '#3B82F6' }; // Blue
+  // Fungsi untuk mendapatkan warna background dan teks label
+  const getLabelConfig = () => {
+    switch (title) {
+      case 'PRODUK BARU':
+        return { bg: '#EBF5FF', text: '#3B82F6' }; // Biru
+      case 'STOK MASUK':
+        return { bg: '#ECFDF5', text: '#10B981' }; // Hijau
+      case 'PENJUALAN':
+      case 'STOK KELUAR':
+        return { bg: '#FEF2F2', text: '#EF4444' }; // Merah
+      case 'UPDATE DATA':
+        return { bg: '#FFF7ED', text: '#F59E0B' }; // Oranye
+      default:
+        return { bg: '#F3F4F6', text: '#6B7280' }; // Abu-abu
     }
-    
-    // HIJAU untuk Stok Masuk
-    if (title === 'STOK MASUK') {
-      return { color: '#10B981' }; // Green
-    }
-    
-    // ORANYE untuk Update Data (Harga, Kategori, Nama, Supplier)
-    if (title.includes('UPDATE')) {
-      return { color: '#F59E0B' }; // Amber/Orange
-    }
-    
-    // MERAH untuk Pengurangan/Penjualan
-    if (title === 'PENJUALAN' || title === 'STOK KELUAR') {
-      return { color: '#EF4444' }; // Red
-    }
-    
-    // Default
-    return { color: COLORS.primary };
   };
+
+  const labelConfig = getLabelConfig();
 
   return (
     <View style={[styles.activityItem, isLast && styles.lastItem]}>
       <View style={styles.activityContent}>
-        <Text style={[styles.activityTitle, getTitleStyle()]}>
-          {title}
-        </Text>
+        {/* LABEL BERWARNA (BADGE) */}
+        <View style={[styles.labelBadge, { backgroundColor: labelConfig.bg }]}>
+          <Text style={[styles.activityTitle, { color: labelConfig.text }]}>
+            {title}
+          </Text>
+        </View>
         
         <Text style={styles.activityMessage}>
-          {formatActivityMessage(activity.message).map((part, idx) => (
+          {messageParts.map((part, idx) => (
             <Text 
               key={idx} 
               style={[
                 part.styleType === 'product' && styles.productText,
-                (part.styleType === 'qty' || part.styleType === 'price') && styles.secondaryBold
+                part.styleType === 'price' && styles.priceText,
+                part.styleType === 'qty' && styles.qtyText,
+                part.styleType === 'normal' && styles.normalText,
               ]}
             >
               {part.text}
@@ -62,7 +62,7 @@ export const ActivityItem = memo(({ activity, isLast, currentUserName }: Activit
         </Text>
 
         <Text style={styles.timestamp}>
-          {activity.time || 'Baru saja'} {activity.userName && ` • ${displayName}`}
+          {activity.time || 'Baru saja'} • {displayName}
         </Text>
       </View>
     </View>
@@ -71,41 +71,53 @@ export const ActivityItem = memo(({ activity, isLast, currentUserName }: Activit
 
 const styles = StyleSheet.create({
   activityItem: { 
-    paddingVertical: 12, 
+    paddingVertical: 14, 
     borderBottomWidth: 1, 
     borderBottomColor: '#F5F5F5' 
   },
-  lastItem: { 
-    borderBottomWidth: 0, 
-    paddingBottom: 5 
-  },
-  activityContent: { 
-    flex: 1 
+  lastItem: { borderBottomWidth: 0 },
+  activityContent: { flex: 1, alignItems: 'flex-start' }, // Align start agar badge tidak full width
+  
+  // Gaya untuk Label Badge
+  labelBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 6,
   },
   activityTitle: { 
-    fontSize: 10, 
+    fontSize: 9, 
     fontFamily: 'PoppinsBold', 
-    marginBottom: 2, 
-    letterSpacing: 0.8 
+    letterSpacing: 0.5,
+    textTransform: 'uppercase'
   },
+  
   activityMessage: { 
-    fontSize: 12, 
-    color: '#444', 
-    lineHeight: 18, 
-    fontFamily: 'PoppinsRegular' 
+    fontSize: 13, 
+    lineHeight: 20, 
+    fontFamily: 'PoppinsRegular',
+    color: '#444'
   },
   timestamp: { 
     fontSize: 10, 
     color: '#999', 
-    marginTop: 4, 
+    marginTop: 6, 
     fontFamily: 'PoppinsRegular' 
   },
   productText: { 
     fontFamily: 'PoppinsBold', 
-    color: '#1E293B' 
+    color: '#000000', 
   },
-  secondaryBold: { 
+  priceText: { 
     fontFamily: 'PoppinsBold', 
-    color: COLORS.secondary 
+    color: '#16a34a', 
+  },
+  qtyText: { 
+    fontFamily: 'PoppinsSemiBold', 
+    color: '#333' 
+  },
+  normalText: {
+    fontFamily: 'PoppinsRegular',
+    color: '#444'
   }
 });

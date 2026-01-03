@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { BaseCard } from '../../ui/BaseCard'; // sesuaikan path
 
 interface BaseStatsGridProps {
   dateLabel?: string;
@@ -9,36 +10,49 @@ interface BaseStatsGridProps {
   containerStyle?: 'card' | 'flat';
 }
 
-// Add 'export' here
 export const BaseStatsGrid: React.FC<BaseStatsGridProps> = ({
   isLoading = false,
   renderHeader,
   renderStats,
   containerStyle = 'card',
 }) => {
-  const isCard = containerStyle === 'card';
-
-  return (
-    <View style={[isCard ? styles.mainCard : styles.flat, { opacity: isLoading ? 0.7 : 1 }]}>
+  const content = (
+    <>
       {renderHeader()}
       {renderStats()}
-    </View>
+    </>
+  );
+
+  // 👉 MODE FLAT (tanpa card)
+  if (containerStyle === 'flat') {
+    return (
+      <View style={[styles.flat, { opacity: isLoading ? 0.7 : 1 }]}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <BaseCard
+      variant="ultraSoft"
+      style={[
+        styles.cardSpacing,
+        { opacity: isLoading ? 0.7 : 1 },
+      ]}
+    >
+      {content}
+    </BaseCard>
   );
 };
 
 const styles = StyleSheet.create({
-  mainCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
+  cardSpacing: {
     padding: 16,
     marginVertical: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    borderWidth: 1,
-    borderColor: '#f5f5f5',
   },
-  flat: { width: '100%', marginVertical: 10 },
+
+  flat: {
+    width: '100%',
+    marginVertical: 10,
+  },
 });

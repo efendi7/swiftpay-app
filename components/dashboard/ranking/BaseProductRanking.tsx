@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ArrowUpDown, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../../../constants/colors';
 import { ProductStat } from '../../../types/dashboard.types';
+import { BaseCard } from '../../ui/BaseCard';
 
 interface BaseProps {
   title: string;
@@ -14,18 +15,17 @@ interface BaseProps {
   limit?: number;
 }
 
-export const BaseProductRanking: React.FC<BaseProps> = ({ 
-  title, 
-  data, 
-  unit, 
-  color, 
-  onSeeMore, 
-  defaultSortAsc = false, 
-  limit = 10 
+export const BaseProductRanking: React.FC<BaseProps> = ({
+  title,
+  data,
+  unit,
+  color,
+  onSeeMore,
+  defaultSortAsc = false,
+  limit = 10,
 }) => {
   const [isAsc, setIsAsc] = useState(defaultSortAsc);
 
-  // Sorting dan Limitasi Data
   const sortedData = [...data]
     .sort((a, b) => (isAsc ? a.value - b.value : b.value - a.value))
     .slice(0, limit);
@@ -33,15 +33,23 @@ export const BaseProductRanking: React.FC<BaseProps> = ({
   const maxValue = Math.max(...data.map(d => d.value), 1);
 
   return (
-    <View style={styles.card}>
+    <BaseCard variant="ultraSoft" style={styles.card}>
+      {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
-        <TouchableOpacity style={styles.filterBtn} onPress={() => setIsAsc(!isAsc)}>
+
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setIsAsc(!isAsc)}
+        >
           <ArrowUpDown size={14} color={COLORS.primary} />
-          <Text style={styles.filterText}>{isAsc ? 'Terendah ↑' : 'Tertinggi ↓'}</Text>
+          <Text style={styles.filterText}>
+            {isAsc ? 'Terendah ↑' : 'Tertinggi ↓'}
+          </Text>
         </TouchableOpacity>
       </View>
 
+      {/* CONTENT */}
       {sortedData.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Belum ada data periode ini</Text>
@@ -54,17 +62,20 @@ export const BaseProductRanking: React.FC<BaseProps> = ({
                 <Text style={styles.itemName} numberOfLines={1}>
                   {index + 1}. {item.name}
                 </Text>
-                <Text style={styles.itemValue}>{item.value} {unit}</Text>
+                <Text style={styles.itemValue}>
+                  {item.value} {unit}
+                </Text>
               </View>
+
               <View style={styles.barContainer}>
-                <View 
+                <View
                   style={[
-                    styles.barFill, 
-                    { 
-                      width: `${(item.value / maxValue) * 100}%`, 
-                      backgroundColor: color 
-                    }
-                  ]} 
+                    styles.barFill,
+                    {
+                      width: `${(item.value / maxValue) * 100}%`,
+                      backgroundColor: color,
+                    },
+                  ]}
                 />
               </View>
             </View>
@@ -78,102 +89,109 @@ export const BaseProductRanking: React.FC<BaseProps> = ({
           )}
         </>
       )}
-    </View>
+    </BaseCard>
   );
 };
 
 const styles = StyleSheet.create({
-  card: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 20, 
-    padding: 18, 
-    marginBottom: 20, 
-    elevation: 3, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.05, 
-    shadowRadius: 5 
+  card: {
+    padding: 18,
+    marginBottom: 20,
   },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 18, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#F5F5F5', 
-    paddingBottom: 10 
+
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
   },
-  title: { 
-    fontSize: 13, 
-    fontFamily: 'PoppinsSemiBold', 
-    color: COLORS.textDark 
+
+  title: {
+    fontSize: 13,
+    fontFamily: 'PoppinsSemiBold',
+    color: COLORS.textDark,
   },
-  filterBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#F0F9F8', 
-    paddingHorizontal: 10, 
-    paddingVertical: 6, 
-    borderRadius: 8 
+
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9F8',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  filterText: { 
-    fontSize: 10, 
-    marginLeft: 5, 
-    color: COLORS.primary, 
-    fontFamily: 'PoppinsMedium' 
+
+  filterText: {
+    fontSize: 10,
+    marginLeft: 5,
+    color: COLORS.primary,
+    fontFamily: 'PoppinsMedium',
   },
-  itemRow: { 
-    marginBottom: 14 
+
+  itemRow: {
+    marginBottom: 14,
   },
-  itemInfo: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    marginBottom: 6 
+
+  itemInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  itemName: { 
-    fontSize: 12, 
-    fontFamily: 'PoppinsRegular', 
-    color: COLORS.textDark, 
-    flex: 1, 
-    marginRight: 10 
+
+  itemName: {
+    fontSize: 12,
+    fontFamily: 'PoppinsRegular',
+    color: COLORS.textDark,
+    flex: 1,
+    marginRight: 10,
   },
-  itemValue: { 
-    fontSize: 12, 
-    fontFamily: 'PoppinsSemiBold', 
-    color: COLORS.textDark 
+
+  itemValue: {
+    fontSize: 12,
+    fontFamily: 'PoppinsSemiBold',
+    color: COLORS.textDark,
   },
-  barContainer: { 
-    height: 6, 
-    backgroundColor: '#F3F4F6', 
-    borderRadius: 3, 
-    width: '100%', 
-    overflow: 'hidden' 
+
+  barContainer: {
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
-  barFill: { 
-    height: '100%', 
-    borderRadius: 3 
+
+  barFill: {
+    height: '100%',
+    borderRadius: 3,
   },
-  emptyContainer: { 
-    paddingVertical: 20, 
-    alignItems: 'center' 
+
+  emptyContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
-  emptyText: { 
-    color: COLORS.textLight, 
-    fontSize: 12, 
-    fontFamily: 'PoppinsRegular' 
+
+  emptyText: {
+    color: COLORS.textLight,
+    fontSize: 12,
+    fontFamily: 'PoppinsRegular',
   },
-  seeMoreBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    marginTop: 10, 
-    paddingTop: 15, 
-    borderTopWidth: 1, 
-    borderTopColor: '#F5F5F5' 
+
+  seeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F2F2F2',
   },
-  seeMoreText: { 
-    fontSize: 12, 
-    color: COLORS.primary, 
-    fontFamily: 'PoppinsMedium', 
-    marginRight: 4 
-  }
+
+  seeMoreText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontFamily: 'PoppinsMedium',
+    marginRight: 4,
+  },
 });
