@@ -12,7 +12,8 @@ export type RootStackParamList = {
   CashierTabs: NavigatorScreenParams<CashierTabParamList>; 
   
   // Screen mandiri (Full Screen)
-  Cashier: undefined;     
+  Cashier: undefined;   
+  CreateCashier: undefined; 
 };
 
 export type AdminTabParamList = {
@@ -20,6 +21,8 @@ export type AdminTabParamList = {
   Product: undefined;
   Transaction: undefined;
   Profile: undefined;
+  CreateCashier: undefined;  
+  CashierManagement: undefined;
 };
 
 export type CashierTabParamList = {

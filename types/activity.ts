@@ -9,5 +9,5 @@ export interface Activity {
 
 export interface ActivityPart {
   text: string;
-  styleType?: 'product' | 'qty' | 'price' | 'normal';
+  styleType?: 'product' | 'qty' | 'price' | 'field' | 'normal';
 }

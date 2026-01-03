@@ -5,27 +5,25 @@ export type SortType = 'latest' | 'oldest';
 
 export interface Transaction {
   id: string;
-  transactionNumber?: string;
+  transactionNumber: string; // ✅ Buat wajib karena setiap TRX pasti punya nomor
   cashierId: string;
-  cashierName?: string;
-  cashierEmail?: string; // Untuk admin view
+  cashierName: string;       // ✅ Buat wajib untuk tampilan List
+  cashierEmail?: string; 
   total: number;
   
-  // ✅ Properti untuk pencatatan uang tunai
-  cashAmount?: number;   // Jumlah uang tunai yang diterima dari pelanggan
-  changeAmount?: number; // Jumlah uang kembalian yang diberikan
+  cashAmount: number;        // ✅ Buat wajib sesuai data Firestore Anda
+  changeAmount: number;      // ✅ Buat wajib sesuai data Firestore Anda
+  paymentMethod: 'cash' | 'qris'; 
   
-  // ✅ TAMBAHKAN INI: Untuk membedakan warna & ikon di UI
-  paymentMethod?: 'cash' | 'qris'; 
-  
-  date?: Timestamp;      // legacy field
-  createdAt: Timestamp;  // Primary timestamp untuk filtering
+  // ✅ Gunakan 'date' sebagai primary karena query kita menggunakan ini
+  date: Timestamp;      
+  createdAt: Timestamp;  
   items: TransactionItem[];
 }
 
 export interface TransactionItem {
   productId: string;
-  productName?: string;
+  productName: string; // ✅ Buat wajib agar List Produk di detail TRX aman
   qty: number;
   price: number;
   subtotal: number;

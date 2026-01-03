@@ -7,8 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'; // Import 
 
 import { auth } from '../services/firebaseConfig';
 import LoginScreen from '../screens/Auth/LoginScreen';
-import RegisterScreen from '../screens/Auth/RegisterScreen';
 import CashierScreen from '../screens/Main/transaction/CashierScreen';
+
 import { OnboardingScreen } from '../screens/onboarding'; // Import ini
 import AdminTabsLayout from './AdminTabsLayout';
 import CashierTabsLayout from './CashierTabsLayout';
@@ -57,28 +57,31 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
-          <>
-            {/* Tampilkan Onboarding HANYA jika isFirstLaunch = true */}
-            {isFirstLaunch && (
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            )}
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-          </>
-        ) : role === 'admin' ? (
-          <Stack.Screen name="AdminTabs" component={AdminTabsLayout} />
-        ) : (
-          <>
-            <Stack.Screen name="CashierTabs" component={CashierTabsLayout} />
-            <Stack.Screen name="Cashier" component={CashierScreen} />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+  <NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!user ? (
+        <>
+          {isFirstLaunch && (
+            <Stack.Screen
+              name="Onboarding"
+              component={OnboardingScreen}
+            />
+          )}
+          <Stack.Screen name="Login" component={LoginScreen} />
+          {/* ❌ Register DIHAPUS */}
+        </>
+      ) : role === 'admin' ? (
+        <Stack.Screen name="AdminTabs" component={AdminTabsLayout} />
+      ) : (
+        <>
+          <Stack.Screen name="CashierTabs" component={CashierTabsLayout} />
+          <Stack.Screen name="Cashier" component={CashierScreen} />
+        </>
+      )}
+    </Stack.Navigator>
+  </NavigationContainer>
+);
+
 };
 
 const styles = StyleSheet.create({
