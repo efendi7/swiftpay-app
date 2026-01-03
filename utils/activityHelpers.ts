@@ -4,109 +4,85 @@ export const getActivityTitle = (type: string, message: string): string => {
   const upperType = type?.toUpperCase();
   const lowerMsg = message?.toLowerCase() || '';
   
-  // 1. Produk Baru
-  if (upperType === 'TAMBAH') {
-    return 'PRODUK BARU';
-  }
-  
-  // 2. Update Field Spesifik (DISESUAIKAN DENGAN SERVICE)
-  if (upperType === 'UPDATE') {
-    // Mencocokkan dengan teks yang dikirim dari ProductService
-    if (lowerMsg.includes('harga jual')) return 'UPDATE HARGA JUAL';
-    if (lowerMsg.includes('harga beli')) return 'UPDATE HARGA BELI';
-    if (lowerMsg.includes('kategori')) return 'UPDATE KATEGORI';
-    if (lowerMsg.includes('nama')) return 'UPDATE NAMA'; // Lebih umum agar mudah nyangkut
-    if (lowerMsg.includes('supplier')) return 'UPDATE SUPPLIER';
-    
-    return 'UPDATE PRODUK';
-  }
-  
-  // 3. Stok Masuk
-  if (upperType === 'MASUK' || upperType === 'IN') {
-    return 'STOK MASUK';
-  }
-  
-  // 4. Stok Keluar / Penjualan
+  if (upperType === 'TAMBAH') return 'PRODUK BARU';
+  if (upperType === 'MASUK' || upperType === 'IN') return 'STOK MASUK';
   if (upperType === 'KELUAR' || upperType === 'OUT') {
-    if (lowerMsg.includes('checkout') || lowerMsg.includes('kasir') || lowerMsg.includes('terjual')) {
-      return 'PENJUALAN';
-    }
-    return 'STOK KELUAR';
+    return (lowerMsg.includes('penjualan') || lowerMsg.includes('trx')) ? 'PENJUALAN' : 'STOK KELUAR';
   }
-  
+  if (upperType === 'UPDATE') return 'UPDATE DATA';
   return 'AKTIVITAS';
 };
 
 export const formatActivityMessage = (message: string): ActivityPart[] => {
+  if (!message) return [{ text: '', styleType: 'normal' }];
+
+  // Bersihkan karakter kutip miring dari iOS/Android dan simbol @
+  const cleanedMessage = message
+    .replace(/@/g, 'seharga')
+    .replace(/[\u201C\u201D]/g, '"'); 
+
   const allMatches: any[] = [];
   
-  // Regex Patterns
-  const productRegex = /"([^"]+)"/g; // Menangkap apapun di dalam tanda kutip
-  const priceRegex = /Rp\s?[\d.,]+/gi; // Menangkap format harga Rp
-  const stockChangeRegex = /(\d+)\s+→\s+(\d+)/g; // Menangkap perubahan stok (10 → 15)
-  const qtyRegex = /(\d+)\s+unit/gi; // Menangkap jumlah unit
-  
-  // Regex untuk menyorot label field (nama, harga jual, dll) sebelum kata "dari"
-  const fieldLabelRegex = /(nama|harga jual|harga beli|kategori|supplier)(?=\sdari)/gi;
+  const patterns = [
+    // Produk: Menangkap teks di DALAM tanda kutip saja
+    { regex: /"([^"]+)"/g, type: 'product' },
+    // Harga: Menangkap format Rp
+    { regex: /Rp\s?[\d.,]+/gi, type: 'price' },
+    // Qty: Menangkap angka + unit secara presisi
+    { regex: /\b\d+\s+unit\b/gi, type: 'qty' }
+  ];
 
-  const findMatches = (regex: RegExp, type: string) => {
+  patterns.forEach(p => {
     let match;
-    while ((match = regex.exec(message)) !== null) {
+    p.regex.lastIndex = 0;
+    while ((match = p.regex.exec(cleanedMessage)) !== null) {
       allMatches.push({
         start: match.index,
         end: match.index + match[0].length,
-        text: match[0],
-        type: type,
+        // Jika produk, tampilkan isinya saja tanpa tanda kutip
+        text: p.type === 'product' ? match[1] : match[0],
+        type: p.type,
       });
     }
-  };
+  });
 
-  // Jalankan pencarian
-  findMatches(productRegex, 'product');
-  findMatches(priceRegex, 'price');
-  findMatches(stockChangeRegex, 'qty');
-  findMatches(qtyRegex, 'qty');
-  findMatches(fieldLabelRegex, 'qty'); // Label field menggunakan warna secondary
-
-  // Sortir semua temuan berdasarkan urutan kemunculan di teks
+  // Urutkan dan filter overlap agar tidak terjadi tabrakan regex
   allMatches.sort((a, b) => a.start - b.start);
   
-  const parts: ActivityPart[] = [];
+  const filteredMatches: any[] = [];
   let lastEnd = 0;
-
   allMatches.forEach((match) => {
-    // Hindari tumpang tindih (overlap) antar regex
-    if (match.start < lastEnd) return; 
-    
-    // Masukkan teks normal di antara highlight
+    if (match.start >= lastEnd) {
+      filteredMatches.push(match);
+      lastEnd = match.end;
+    }
+  });
+  
+  const parts: ActivityPart[] = [];
+  lastEnd = 0;
+
+  filteredMatches.forEach((match) => {
     if (match.start > lastEnd) {
       parts.push({ 
-        text: message.substring(lastEnd, match.start), 
+        text: cleanedMessage.substring(lastEnd, match.start), 
         styleType: 'normal' 
       });
     }
     
-    // Bersihkan tanda kutip jika tipe-nya produk agar tampilan lebih bersih
-    let displayText = match.text;
-    if (match.type === 'product') {
-      displayText = match.text.replace(/"/g, ''); 
-    }
-    
     parts.push({ 
-      text: displayText, 
+      text: match.text, 
       styleType: match.type as any 
     });
     
     lastEnd = match.end;
   });
 
-  // Masukkan sisa teks di akhir kalimat
-  if (lastEnd < message.length) {
+  if (lastEnd < cleanedMessage.length) {
     parts.push({ 
-      text: message.substring(lastEnd), 
+      text: cleanedMessage.substring(lastEnd), 
       styleType: 'normal' 
     });
   }
   
-  return parts.length > 0 ? parts : [{ text: message, styleType: 'normal' }];
+  return parts.length > 0 ? parts : [{ text: cleanedMessage, styleType: 'normal' }];
 };

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { signOut } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
-import { auth } from '../services/firebaseConfig';
+import { auth, db } from '../services/firebaseConfig';
 import { ProfileService } from '../services/profileService';
+import { doc, getDoc } from 'firebase/firestore';
 
 export const useProfileLogic = () => {
   const user = auth.currentUser;
@@ -11,9 +12,24 @@ export const useProfileLogic = () => {
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [role, setRole] = useState<string>(''); // State untuk Role dinamis
 
   useEffect(() => {
     if (user?.displayName) setDisplayName(user.displayName);
+    
+    const fetchUserRole = async () => {
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setRole(userDoc.data().role || 'Kasir');
+          }
+        } catch (error) {
+          console.error("Error fetching role:", error);
+        }
+      }
+    };
+    fetchUserRole();
   }, [user]);
 
   const pickImage = async () => {
@@ -38,7 +54,6 @@ export const useProfileLogic = () => {
       Alert.alert('Peringatan', 'Nama minimal 3 karakter');
       return;
     }
-
     setLoading(true);
     try {
       let finalImageUrl = user.photoURL || '';
@@ -73,16 +88,7 @@ export const useProfileLogic = () => {
   };
 
   return {
-    user,
-    isEditing,
-    setIsEditing,
-    displayName,
-    setDisplayName,
-    loading,
-    selectedImage,
-    pickImage,
-    saveProfile,
-    logout,
-    cancelEdit
+    user, role, isEditing, setIsEditing, displayName, setDisplayName,
+    loading, selectedImage, pickImage, saveProfile, logout, cancelEdit
   };
 };

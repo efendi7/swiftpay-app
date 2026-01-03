@@ -17,16 +17,23 @@ const CLOUD_NAME = 'dlkrdbabo';
 const UPLOAD_PRESET = 'expo_products'; 
 
 export class ProductService {
-  private static async logActivity(batch: any, type: 'MASUK' | 'KELUAR' | 'UPDATE' | 'TAMBAH', message: string) {
-    const activityRef = doc(collection(db, 'activities'));
-    const user = auth.currentUser;
-    batch.set(activityRef, {
-      type,
-      message,
-      userName: user?.displayName || user?.email?.split('@')[0] || 'Admin',
-      createdAt: serverTimestamp(),
-    });
-  }
+
+// Bagian logActivity yang diperbaiki
+private static async logActivity(batch: any, type: 'IN' | 'OUT' | 'UPDATE' | 'TAMBAH', message: string) {
+  const activityRef = doc(collection(db, 'activities'));
+  const user = auth.currentUser;
+  
+  // Gunakan displayName jika ada, jika tidak ada gunakan email, default 'Admin'
+  const userName = user?.displayName || user?.email?.split('@')[0] || 'Admin';
+  
+  batch.set(activityRef, {
+    type, 
+    message,
+    userName, 
+    userId: user?.uid,
+    createdAt: serverTimestamp(),
+  });
+}
 
   // --- LOGIKA KATEGORI ---
   static async addCategory(name: string): Promise<void> {
@@ -107,90 +114,88 @@ export class ProductService {
     }
   }
 
-  // HANYA SATU FUNGSI UPDATEPRODUCT
   static async updateProduct(
-  productId: string,
-  data: ProductFormData,
-  oldData: {
-    name: string;
-    stock: number;
-    price: number;
-    purchasePrice: number;
-    category: string;
-    supplier: string;
-  }
-): Promise<void> {
-  const validation = this.validateProduct(data);
-  if (!validation.isValid) throw new Error(validation.error);
+    productId: string,
+    data: ProductFormData,
+    oldData: {
+      name: string;
+      stock: number;
+      price: number;
+      purchasePrice: number;
+      category: string;
+      supplier: string;
+    }
+  ): Promise<void> {
+    const validation = this.validateProduct(data);
+    if (!validation.isValid) throw new Error(validation.error);
 
-  try {
-    const batch = writeBatch(db);
-    const productRef = doc(db, 'products', productId);
-    
-    const newStock = parseInt(data.stock) || 0;
-    const newName = data.name.trim();
-    const newPrice = parseFloat(data.price);
-    const newPurchasePrice = parseFloat(data.purchasePrice);
-    const newCategory = data.category?.trim() || 'Tanpa Kategori';
-    const newSupplier = data.supplier?.trim() || 'Umum';
+    try {
+      const batch = writeBatch(db);
+      const productRef = doc(db, 'products', productId);
+      
+      const newStock = parseInt(data.stock) || 0;
+      const newName = data.name.trim();
+      const newPrice = parseFloat(data.price);
+      const newPurchasePrice = parseFloat(data.purchasePrice);
+      const newCategory = data.category?.trim() || 'Tanpa Kategori';
+      const newSupplier = data.supplier?.trim() || 'Umum';
 
-    const changes: string[] = [];
-    
-    // DETEKSI PERUBAHAN FIELD RINCI
-    if (oldData.name !== newName) {
-      changes.push(`nama dari "${oldData.name}" menjadi "${newName}"`);
-    }
-    if (oldData.price !== newPrice) {
-      changes.push(`harga jual dari Rp ${oldData.price.toLocaleString('id-ID')} menjadi Rp ${newPrice.toLocaleString('id-ID')}`);
-    }
-    if (oldData.purchasePrice !== newPurchasePrice) {
-      changes.push(`harga beli dari Rp ${oldData.purchasePrice.toLocaleString('id-ID')} menjadi Rp ${newPurchasePrice.toLocaleString('id-ID')}`);
-    }
-    if (oldData.category !== newCategory) {
-      changes.push(`kategori dari "${oldData.category}" menjadi "${newCategory}"`);
-    }
-    if (oldData.supplier !== newSupplier) {
-      changes.push(`supplier dari "${oldData.supplier}" menjadi "${newSupplier}"`);
-    }
+      const changes: string[] = [];
+      
+      // DETEKSI PERUBAHAN FIELD RINCI
+      if (oldData.name !== newName) {
+        changes.push(`nama dari "${oldData.name}" menjadi "${newName}"`);
+      }
+      if (oldData.price !== newPrice) {
+        changes.push(`harga jual dari Rp ${oldData.price.toLocaleString('id-ID')} menjadi Rp ${newPrice.toLocaleString('id-ID')}`);
+      }
+      if (oldData.purchasePrice !== newPurchasePrice) {
+        changes.push(`harga beli dari Rp ${oldData.purchasePrice.toLocaleString('id-ID')} menjadi Rp ${newPurchasePrice.toLocaleString('id-ID')}`);
+      }
+      if (oldData.category !== newCategory) {
+        changes.push(`kategori dari "${oldData.category}" menjadi "${newCategory}"`);
+      }
+      if (oldData.supplier !== newSupplier) {
+        changes.push(`supplier dari "${oldData.supplier}" menjadi "${newSupplier}"`);
+      }
 
-    // 1. LOG UPDATE DATA (NAMA, HARGA, DLL)
-    if (changes.length > 0) {
-      // Gunakan oldData.name sebagai subjek agar admin tahu produk mana yang diedit
-      this.logActivity(
-        batch, 
-        'UPDATE', 
-        `Update data produk "${oldData.name}": ${changes.join(', ')}`
-      );
-    }
+      // 1. LOG UPDATE DATA (NAMA, HARGA, DLL)
+      if (changes.length > 0) {
+        this.logActivity(
+          batch, 
+          'UPDATE', 
+          `Update data produk "${oldData.name}": ${changes.join(', ')}`
+        );
+      }
 
-    // 2. LOG PERUBAHAN STOK (TERPISAH)
-    if (newStock !== oldData.stock) {
-      const diff = newStock - oldData.stock;
-      this.logActivity(
-        batch, 
-        diff > 0 ? 'MASUK' : 'KELUAR', 
-        `Stok "${newName}" ${diff > 0 ? 'ditambah' : 'dikurangi'} sebanyak ${Math.abs(diff)} unit (${oldData.stock} → ${newStock})`
-      );
-    }
-
-    // Eksekusi update produk ke koleksi 'products'
-    batch.update(productRef, {
-      name: newName,
-      price: newPrice,
-      purchasePrice: newPurchasePrice,
-      supplier: newSupplier,
-      category: newCategory,
-      stock: newStock,
-      barcode: data.barcode.trim(),
-      imageUrl: data.imageUrl || '',
-      updatedAt: serverTimestamp()
-    });
-    
-    await batch.commit();
-  } catch (error: any) {
-    throw new Error('Gagal update: ' + error.message);
-  }
+      // 2. LOG PERUBAHAN STOK (TERPISAH)
+      if (newStock !== oldData.stock) {
+  const diff = newStock - oldData.stock;
+  this.logActivity(
+    batch, 
+    diff > 0 ? 'IN' : 'OUT', // Gunakan 'IN' untuk stok masuk
+    `Stok "${newName}" ${diff > 0 ? 'ditambah' : 'dikurangi'} sebanyak ${Math.abs(diff)} unit (${oldData.stock} → ${newStock})`
+  );
 }
+
+      // Eksekusi update produk ke koleksi 'products'
+      batch.update(productRef, {
+        name: newName,
+        price: newPrice,
+        purchasePrice: newPurchasePrice,
+        supplier: newSupplier,
+        category: newCategory,
+        stock: newStock,
+        barcode: data.barcode.trim(),
+        imageUrl: data.imageUrl || '',
+        updatedAt: serverTimestamp()
+      });
+      
+      await batch.commit();
+    } catch (error: any) {
+      throw new Error('Gagal update: ' + error.message);
+    }
+  }
 
   // --- VALIDASI & HELPER ---
   static validateProduct(data: ProductFormData): ProductValidationResult {

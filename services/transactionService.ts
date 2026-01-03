@@ -49,6 +49,8 @@ export const migrateSoldCount = async () => {
 /**
  * 2. FUNGSI CHECKOUT (Update Stok & SoldCount Real-time)
  */
+// ... (import tetap sama)
+
 export const handleCheckoutProcess = async (
   cartItems: any[], 
   total: number, 
@@ -59,101 +61,76 @@ export const handleCheckoutProcess = async (
 ) => {
   try {
     return await runTransaction(db, async (transaction) => {
-      // 1. Validasi Stok secara Atomik
+      // 1. Validasi Stok
       for (const item of cartItems) {
         const productRef = doc(db, 'products', item.id);
         const productDoc = await transaction.get(productRef);
-        
-        if (!productDoc.exists()) {
-          throw new Error(`Produk ${item.name} tidak ditemukan!`);
-        }
-
+        if (!productDoc.exists()) throw new Error(`Produk ${item.name} tidak ditemukan!`);
         const currentStock = productDoc.data().stock;
-        if (currentStock < item.qty) {
-          throw new Error(`Stok ${item.name} tidak cukup. Tersisa: ${currentStock}`);
-        }
+        if (currentStock < item.qty) throw new Error(`Stok ${item.name} tidak cukup.`);
       }
 
-      // 2. Generate Nomor Transaksi dari Counter
+      // 2. Nomor Transaksi
       const counterRef = doc(db, 'counters', 'transactions');
       const counterSnap = await transaction.get(counterRef);
-      let nextNumber = 1;
-      if (counterSnap.exists()) {
-        nextNumber = (counterSnap.data()?.count || 0) + 1;
-      }
+      let nextNumber = (counterSnap.data()?.count || 0) + 1;
       transaction.set(counterRef, { count: increment(1) }, { merge: true });
 
-      const year = new Date().getFullYear();
-      const transactionNumber = `TRX-${year}-${String(nextNumber).padStart(4, '0')}`;
+      const transactionNumber = `TRX-${new Date().getFullYear()}-${String(nextNumber).padStart(4, '0')}`;
 
-      // 3. Update Stok Produk & SoldCount
+      // 3. Update Stok & SoldCount
       cartItems.forEach((item) => {
         const pRef = doc(db, 'products', item.id);
         transaction.update(pRef, { 
           stock: increment(-item.qty),
-          soldCount: increment(item.qty) // Update real-time di sini
+          soldCount: increment(item.qty) 
         });
       });
 
-      // 4. Simpan Data Transaksi Utama
-      const transactionRef = doc(collection(db, 'transactions'));
-      transaction.set(transactionRef, {
-        transactionNumber,
-        cashierId: user.uid,
-        cashierName: user.displayName || user.email?.split('@')[0] || 'Kasir',
-        cashierEmail: user.email,
-        total: total,
-        cashAmount: cashAmount,
-        changeAmount: changeAmount,
-        paymentMethod: paymentMethod,
-        date: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        items: cartItems.map(item => ({
-          productId: item.id,
-          productName: item.name,
-          qty: item.qty,
-          price: item.price,
-          subtotal: item.qty * item.price
-        }))
-      });
+      // 4. Simpan Transaksi
+      // 4. Simpan Transaksi
+const transactionRef = doc(collection(db, 'transactions'));
+transaction.set(transactionRef, {
+  transactionNumber,
+  // TAMBAHKAN FIELD INI AGAR MANAGEMENT SCREEN TIDAK 0
+  cashierId: user.uid, 
+  cashierEmail: user.email,
+  cashierName: user.displayName || 'Kasir',
+  total,
+  date: serverTimestamp(),
+  cashAmount,      // Tambahkan juga agar data transaksi lengkap
+  changeAmount,    // Tambahkan juga agar data transaksi lengkap
+  paymentMethod,
+  items: cartItems.map(item => ({
+    productId: item.id, // Pastikan productId disimpan di sini juga
+    productName: item.name,
+    qty: item.qty,
+    price: item.price,
+    subtotal: item.qty * item.price
+  }))
+});
 
-      // 5. Simpan Log Aktivitas dengan detail lengkap
-      const activityRef = doc(collection(db, 'activities'));
-      const totalQty = cartItems.reduce((sum, item) => sum + item.qty, 0);
-      
-      // Format detail produk yang dibeli
-      const productDetails = cartItems.map(item => 
-        `${item.qty}x ${item.name} (@ Rp ${item.price.toLocaleString('id-ID')})`
-      ).join(', ');
-      
-      const formattedTotal = `Rp ${total.toLocaleString('id-ID')}`;
-      const paymentMethodText = paymentMethod === 'cash' ? 'Tunai' : 'QRIS';
-      
-      let message = `Penjualan ${transactionNumber}: ${productDetails} - Total ${formattedTotal} via ${paymentMethodText}`;
-      
-      // Tambahkan info uang tunai dan kembalian jika cash
-      if (paymentMethod === 'cash') {
-        message += ` (Bayar: Rp ${cashAmount.toLocaleString('id-ID')}`;
-        if (changeAmount > 0) {
-          message += `, Kembalian: Rp ${changeAmount.toLocaleString('id-ID')}`;
-        }
-        message += ')';
-      }
+      // 5. Simpan Log Aktivitas (DIPERBAIKI)
+const activityRef = doc(collection(db, 'activities'));
 
-      transaction.set(activityRef, {
-        type: 'KELUAR',
-        message: message,
-        userName: user.displayName || user.email?.split('@')[0] || 'Kasir',
-        transactionNumber: transactionNumber, // Simpan nomor transaksi untuk referensi
-        totalAmount: total,
-        totalItems: totalQty,
-        createdAt: serverTimestamp(),
-      });
+const productDetails = cartItems.map(item => 
+  `${item.qty} unit "${item.name}" seharga Rp ${item.price.toLocaleString('id-ID')}`
+).join(', ');
+
+const message = `Penjualan ${transactionNumber}: ${productDetails}. Total Rp ${total.toLocaleString('id-ID')}`;
+
+transaction.set(activityRef, {
+  type: 'KELUAR',
+  message: message,
+  userName: user.displayName || 'Kasir',
+  userId: user.uid,           // <--- TAMBAHKAN INI (ID User yang sedang login)
+  createdAt: serverTimestamp(), // <--- SUDAH BENAR (Pastikan terkirim ke Firestore)
+});
 
       return { success: true, transactionNumber };
     });
   } catch (e) {
-    console.error("Transaction Error: ", e);
+    console.error(e);
     throw e;
   }
 };

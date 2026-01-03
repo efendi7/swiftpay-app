@@ -10,7 +10,9 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   onSnapshot,
-  Unsubscribe
+  Unsubscribe,
+  writeBatch,
+  doc
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { DashboardStats, ProductStat, DateRange } from '../types/dashboard.types';
@@ -157,7 +159,7 @@ export class DashboardService {
   /**
    * Format waktu relatif (Baru saja, 5m lalu, 2j lalu, dll)
    */
-  private static formatRelativeTime(date: Date) {
+  public static formatRelativeTime(date: Date) {
     if (!date) return 'Baru saja';
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -240,134 +242,123 @@ export class DashboardService {
   }
 
   static async fetchDashboardStats(
-    dateRange: DateRange,
-    preset: 'today' | 'week' | 'month' | 'year'
-  ): Promise<DashboardStats> {
-    try {
-      const startTimestamp = Timestamp.fromDate(dateRange.startDate);
-      const endTimestamp = Timestamp.fromDate(dateRange.endDate);
+  dateRange: DateRange,
+  preset: 'today' | 'week' | 'month' | 'year'
+): Promise<DashboardStats> {
+  try {
+    const startTimestamp = Timestamp.fromDate(dateRange.startDate);
+    const endTimestamp = Timestamp.fromDate(dateRange.endDate);
 
-      // --- 1. DATA PRODUK (STOK) ---
-      const productsSnap = await getDocs(collection(db, 'products'));
-      let lowStockCount = 0;
-      const productsData: Array<{ id: string; name: string; stock: number }> = [];
-
-      productsSnap.forEach((doc) => {
-        const data = doc.data();
-        const stockValue = Number(data.stock || 0);
-        
-        if (stockValue < 10) lowStockCount++;
-        
-        productsData.push({
-          id: doc.id,
-          name: data.name || 'Tanpa Nama',
-          stock: stockValue,
-        });
-      });
-
-      // --- 2. DATA TRANSAKSI (untuk menghitung sold) ---
-      const transactionsQuery = query(
-        collection(db, 'transactions'),
-        where('date', '>=', startTimestamp),
-        where('date', '<=', endTimestamp)
-      );
-      const transactionsSnap = await getDocs(transactionsQuery);
-
-      let totalRevenue = 0;
-      let totalOut = 0;
+    // --- 1. DATA PRODUK (STOK & AKUMULASI PENJUALAN) ---
+    // Mengambil data produk langsung untuk sinkronisasi ranking total
+    const productsSnap = await getDocs(collection(db, 'products'));
+    let lowStockCount = 0;
+    
+    const productsData = productsSnap.docs.map(doc => {
+      const data = doc.data();
+      const stockValue = Number(data.stock || 0);
+      const soldValue = Number(data.soldCount || 0); // Field akumulasi penjualan
       
-      // Map untuk menghitung jumlah terjual per produk
-      const soldMap = new Map<string, number>();
+      if (stockValue < 10) lowStockCount++;
       
-      // Map untuk nama produk (untuk salesRanking)
-      const productNameMap = new Map<string, string>();
-      
-      const chartDataMap = this.generateChartDataMap(preset);
-
-      transactionsSnap.forEach((doc) => {
-        const data = doc.data();
-        const total = Number(data.total || 0);
-        totalRevenue += total;
-
-        const tDate = data.date?.toDate();
-        if (tDate) {
-          const key = this.getChartKey(tDate, preset);
-          if (chartDataMap.has(key)) {
-            chartDataMap.set(key, (chartDataMap.get(key) || 0) + total);
-          }
-
-          if (Array.isArray(data.items)) {
-            data.items.forEach((item: any) => {
-              const qty = Number(item.qty || 0);
-              const productId = item.productId;
-              
-              totalOut += qty;
-              
-              // Hitung sold per produk
-              if (productId) {
-                soldMap.set(productId, (soldMap.get(productId) || 0) + qty);
-                productNameMap.set(productId, item.productName || 'Produk Terhapus');
-              }
-            });
-          }
-        }
-      });
-
-      // --- 3. STOCK RANKING (Urutkan dari stok terkecil) ---
-      const stockRanking: ProductStat[] = productsData
-        .map(p => ({
-          id: p.id,
-          name: p.name,
-          value: p.stock,
-        }))
-        .sort((a, b) => a.value - b.value)
-        .slice(0, 10);
-
-      // --- 4. SALES RANKING (Produk terlaris berdasarkan transaksi) ---
-      const salesRanking: ProductStat[] = Array.from(soldMap, ([id, qty]) => ({
-        id,
-        name: productNameMap.get(id) || 'Produk Tidak Diketahui',
-        value: qty,
-      }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 10);
-
-      // --- 5. DATA PENGELUARAN ---
-      const expenseQuery = query(
-        collection(db, 'stock_purchases'),
-        where('date', '>=', startTimestamp),
-        where('date', '<=', endTimestamp)
-      );
-      const expenseSnap = await getDocs(expenseQuery);
-      
-      let totalExpense = 0;
-      let totalIn = 0;
-      expenseSnap.forEach((doc) => {
-        const data = doc.data();
-        totalExpense += Number(data.totalCost || 0);
-        totalIn += Number(data.quantity || 0);
-      });
-
       return {
-        totalProducts: productsSnap.size,
-        totalTransactions: transactionsSnap.size,
-        totalRevenue,
-        totalExpense,
-        totalProfit: totalRevenue - totalExpense,
-        lowStockCount,
-        totalIn,
-        totalOut,
-        weeklyData: Array.from(chartDataMap, ([label, value]) => ({ label, value })),
-        stockRanking,
-        salesRanking,
-        // Tambahkan label tanggal
-        dateRangeLabel: this.getDateRangeLabel(preset, dateRange),
+        id: doc.id,
+        name: data.name || 'Tanpa Nama',
+        stock: stockValue,
+        soldCount: soldValue
       };
-    } catch (error) {
-      console.error('DashboardService Error:', error);
-      throw error;
-    }
+    });
+
+    // --- 2. DATA TRANSAKSI (FILTER BERDASARKAN WAKTU) ---
+    // Digunakan untuk Statistik Pendapatan, Chart, dan Total Barang Keluar
+    const transactionsQuery = query(
+      collection(db, 'transactions'),
+      where('date', '>=', startTimestamp),
+      where('date', '<=', endTimestamp)
+    );
+    const transactionsSnap = await getDocs(transactionsQuery);
+
+    let totalRevenue = 0;
+    let totalOut = 0;
+    const chartDataMap = this.generateChartDataMap(preset);
+
+    transactionsSnap.forEach((doc) => {
+      const data = doc.data();
+      const total = Number(data.total || 0);
+      totalRevenue += total;
+
+      const tDate = data.date?.toDate();
+      if (tDate) {
+        const key = this.getChartKey(tDate, preset);
+        if (chartDataMap.has(key)) {
+          chartDataMap.set(key, (chartDataMap.get(key) || 0) + total);
+        }
+
+        if (Array.isArray(data.items)) {
+          data.items.forEach((item: any) => {
+            totalOut += Number(item.qty || 0);
+          });
+        }
+      }
+    });
+
+    // --- 3. STOCK RANKING (Urutkan dari stok terkecil) ---
+    const stockRanking: ProductStat[] = [...productsData]
+      .sort((a, b) => a.stock - b.stock)
+      .slice(0, 10)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        value: p.stock,
+      }));
+
+    // --- 4. SALES RANKING (SELALU SINKRON DENGAN LIST PRODUK) ---
+    // Menggunakan data akumulasi soldCount dari koleksi produk
+    const salesRanking: ProductStat[] = [...productsData]
+      .filter(p => p.soldCount > 0)
+      .sort((a, b) => b.soldCount - a.soldCount)
+      .slice(0, 10)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        value: p.soldCount,
+      }));
+
+    // --- 5. DATA PENGELUARAN (FILTER BERDASARKAN WAKTU) ---
+    const expenseQuery = query(
+      collection(db, 'stock_purchases'),
+      where('date', '>=', startTimestamp),
+      where('date', '<=', endTimestamp)
+    );
+    const expenseSnap = await getDocs(expenseQuery);
+    
+    let totalExpense = 0;
+    let totalIn = 0;
+    expenseSnap.forEach((doc) => {
+      const data = doc.data();
+      totalExpense += Number(data.totalCost || 0);
+      totalIn += Number(data.quantity || 0);
+    });
+
+    return {
+      totalProducts: productsSnap.size,
+      totalTransactions: transactionsSnap.size,
+      totalRevenue,
+      totalExpense,
+      totalProfit: totalRevenue - totalExpense,
+      lowStockCount,
+      totalIn,
+      totalOut,
+      weeklyData: Array.from(chartDataMap, ([label, value]) => ({ label, value })),
+      stockRanking,
+      salesRanking,
+      dateRangeLabel: this.getDateRangeLabel(preset, dateRange),
+    };
+  } catch (error) {
+    console.error('DashboardService Error:', error);
+    throw error;
   }
+}
 
   private static generateChartDataMap(preset: string): Map<string, number> {
     const map = new Map<string, number>();
@@ -438,4 +429,88 @@ export class DashboardService {
       maximumFractionDigits: 0,
     }).format(value);
   }
+
+  // Tambahkan di dalam class DashboardService
+static async fetchCashierPerformance() {
+  try {
+    const usersRef = collection(db, 'users');
+    const qUsers = query(usersRef, where('role', '==', 'kasir'));
+    const userSnap = await getDocs(qUsers);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const transRef = collection(db, 'transactions');
+    // ✅ Gunakan field 'date' karena data terbaru Anda memilikinya
+    const qTrans = query(
+      transRef,
+      where('date', '>=', Timestamp.fromDate(todayStart)),
+      where('date', '<=', Timestamp.fromDate(todayEnd))
+    );
+    
+    const transSnap = await getDocs(qTrans);
+    const allTodayTransactions = transSnap.docs.map(d => d.data());
+
+    const cashierList = userSnap.docs.map((userDoc) => {
+      const userData = userDoc.data();
+      const userId = userDoc.id;
+
+      // ✅ Pastikan pencocokan ID dilakukan dengan teliti
+      const myTransactions = allTodayTransactions.filter(t => t.cashierId === userId);
+      
+      let totalRevenue = 0;
+      let totalQty = 0;
+
+      myTransactions.forEach(t => {
+        totalRevenue += Number(t.total || 0);
+        // ✅ Hitung juga total unit terjual untuk statistik tambahan
+        if (t.items) {
+            t.items.forEach((item: any) => totalQty += (item.qty || 0));
+        }
+      });
+
+      return {
+        id: userId,
+        name: userData.displayName || 'Tanpa Nama',
+        email: userData.email,
+        photoURL: userData.photoURL,
+        status: userData.status || 'active',
+        todayRevenue: totalRevenue,
+        transactionCount: myTransactions.length,
+        todayOut: totalQty // Tambahkan ini untuk UI Manajemen
+      };
+    });
+
+    return cashierList;
+  } catch (error) {
+    console.error("Error Detail:", error);
+    return [];
+  }
 }
+
+static async clearAllActivities() {
+    try {
+      const activityRef = collection(db, 'activities');
+      const snapshot = await getDocs(activityRef);
+      
+      if (snapshot.empty) return { success: true, count: 0 };
+
+      // Inisialisasi batch dengan menyertakan 'db'
+      const batch = writeBatch(db); 
+
+      snapshot.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+
+      // Eksekusi semua perintah hapus secara sekaligus
+      await batch.commit(); 
+      
+      return { success: true, count: snapshot.size };
+    } catch (error) {
+      console.error("Gagal menghapus aktivitas:", error);
+      throw error;
+    }
+  }
+};
